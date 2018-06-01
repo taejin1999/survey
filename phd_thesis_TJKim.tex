@@ -1,0 +1,213 @@
+% if you want to print your thesis on one side on the papar, use 'oneside' option 
+% if you want to print your thesis on both sides on the papr, do not use 'oneside' option
+% the template will generate blank pages bwteen title pages, sections, list of contents ...
+\documentclass[11pt,b5paper,oneside]{snuthesis-kor}
+%\documentclass[11pt,b5paper]{snuthesis-kor}
+%\special{papersize=8.5in,11in}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% include additional packages you need to use
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% graphic, float package
+\usepackage{graphicx}		% for setting images
+\usepackage{float}			% for float objects
+\usepackage{subfigure}		% for adding several figures in a figure environment
+\usepackage{lscape}			% for landscape type images or tables
+\usepackage{url}
+
+% mathmetical presentation
+\usepackage{gensymb}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{amsthm}
+%\usepackage{mathptm}
+\usepackage{exscale}
+\usepackage{textcomp}		% extra symbols
+\usepackage{comment}
+\usepackage{upgreek}
+\usepackage{bigstrut}
+\usepackage{stfloats}
+\usepackage{color}
+\usepackage{here}
+\usepackage[mathcal]{eucal}
+\DeclareSymbolFont{usualmathcal}{OMS}{cmsy}{m}{n}
+\DeclareSymbolFontAlphabet{\mathcal}{usualmathcal}
+
+% package for using algorithmic presentation
+\usepackage{algorithmic}
+\usepackage{algorithm}
+% customize algorithmic environment
+\renewcommand{\algorithmicrequire}{\makebox[40px]{\hfill\textbf{Input :}}}
+\renewcommand{\algorithmicensure}{\makebox[40px]{\hfill\textbf{Output :}}}
+
+
+% array and table presentation
+\usepackage[utf8]{inputenc} 
+\usepackage{array}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+%\usepackage{ctable}
+\usepackage{booktabs}		% for typesetting tables at the level of publication		
+							% do not use vertical rule
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% set document layout and default look and feel such spacings and indentations
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% set page layout, default margin is 3cm
+\geometry{margin=3cm}
+
+% set double spacing
+\doublespacing
+
+% set indentation
+\setlength{\parindent}{2em}
+
+% if you do not want indent first paragraph in each chapter, section, and sub sections
+% remove below line
+\usepackage{indentfirst}
+
+% if you want to make vertical spaces between paragraphs,
+% removfe comments the below line and change dime '10pt' as what you want 
+\setlength{\parskip}{10pt}
+
+% adjust spacing below the caption 
+\setlength{\belowcaptionskip}{5pt}
+
+
+% if you want to make index, 
+% use \makeindex in preamble, 
+% use \index at the word you want to index, 
+% and use \printindex where you want to print the index
+\makeindex
+
+
+% hyperref package can generate pdf references
+% must be loaded at last
+%\usepackage[unicode]{hyperref}
+
+
+% define new theorem like entities you need
+\newtheorem{lemma}{Lemma}
+\newtheorem{definition}{Definition}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% set parper variables
+% thesis summary
+%\title{낸드 플래시 기반 저장장치\\ 성능 및 수명 개선 기법} 
+
+\title{{\LARGE 낸드 플래시 기반 저장장치의 수명 향상을 위한 계층 교차 최적화 기법}}
+\engtitle{{\Large Cross-Layer Optimization Techniques for Extending Lifetime of NAND Flash-Based Storage Devices}}
+%\keywords{NAND Flash Memory, Flash-Based Storage Devices, Storage Performance Optimization, Operating System, Embedded System, Storage Reliability Management}
+\keywords{NAND Flash Memory, NAND Flash-Based Storage Devices, Storage Lifetime, Embedded Software,}
+\engkeywords{낸드 플래시 메모리, 플래시 기반 저장 장치, 저장장치 수명, 임베디드 소프트웨어}
+
+
+\university{서울대학교 대학원}
+\enguniversity{The Graduate School\\Seoul National University}
+\collegeordept{전기$\cdot$컴퓨터 공학부}
+\engcollegeordept{Department of Electrical Engineering & Computer Science}
+
+\author{김태진}
+\engauthor{Taejin Kim}
+\studentnumber{2012-30201}
+\hpnumber{010-8817-0050}
+
+% degree 
+\msorphd{공학박사}
+\degreetitle{공학박사}
+
+% dates
+%\submitdate{2015년 11월}
+%\acceptdate{2016년 1월}
+%\degreedate{2016년 2월}
+%\agreedate{2016년 2월 15일}
+
+
+% advisor and commitees
+% If you are writing master thesis, just do not fill commiteeb and commiteec, 
+% then agreement page will be automatically adjusted. 
+\advisor{지도교수~~~~김~지~홍}
+\chief{~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+\vicechief{~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+\commiteea{~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+\commiteeb{~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+\commiteec{~~~~~~~~~~~~~~~~~~~~~~~~~~~}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% start thesis
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\begin{document}
+
+
+% set page style as not generating page numbers
+\pagestyle{empty}
+
+%title page
+\maketitle
+
+%submission page
+\makesubmission
+
+%%agreement page
+%\makeagreement
+
+% set page style as generating roman page numbers
+\newpage
+\pagestyle{plain}
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+
+\input{Abstract.tex}
+
+%========================================================================
+% table of contents, list of figures and tables
+% rename toc, lof, lot, and ref
+\renewcommand{\contentsname}{Contents}
+\renewcommand{\listfigurename}{List of Figures}
+\renewcommand{\listtablename}{List of Tables}
+\renewcommand{\bibname}{Bibliography}
+
+
+%========================================================================
+\tableofcontents
+
+\listoffigures
+ 
+\listoftables
+
+
+%========================================================================
+% set page style as generating arabic page numbers
+\clearpagebefore
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+%========================================================================
+% main body
+\input{Introduction.tex}
+\input{Background.tex}
+\input{PCstream.tex}
+\input{Finededup.tex}
+\input{Conclusions.tex}
+\input{Reference.tex}
+%\input{abstract_ko.tex}
+
+%========================================================================
+% index 
+\clearpagebefore
+\phantomsection
+\addcontentsline{toc}{chapter}{Appendix}
+\printindex
+
+%========================================================================
+% thanksto
+%\input{thanks.tex}
+
+\normalsize
+\end{document}

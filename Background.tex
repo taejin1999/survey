@@ -1,0 +1,208 @@
+
+\chapter{Background} 
+\label{chap:Background}
+
+
+In order to improve NAND endurance, reliability and performance parameters are dynamically changed during run time in this dissertation.
+In this chapter, we review the basics of key \textit{Vth} design parameters and the principals of a NAND program operation.
+
+
+\section{Threshold Voltage Window of NAND Flash Memory}
+\label{sec:Background_ThresholdVoltageWindow}
+
+NAND flash memory stores data into cells by changing their \textit{Vth} states depending on bit information, and restores data from cells by sensing their \textit{Vth} states.
+Figure~\ref{fig:Background_VthDistribution} illustrates an example of \textit{Vth} distributions for an MLC NAND device which stores two bits in a cell by using four distinct \textit{Vth} states distinguished by three read reference voltages.
+
+
+\begin{figure}[t]
+\centering
+%\includegraphics[scale=1.15]{./Figures/2_Background/VthDistribution.eps}
+\caption{An example of \textit{Vth} distributions for MLC NAND flash memory and primary \textit{Vth} design parameters for the NAND requirements.}
+\label{fig:Background_VthDistribution}
+\end{figure}
+
+
+Aside from serving as a non-volatile storage medium, MLC NAND devices are also required to meet the specified NAND requirements~\cite{Flash_Brewer}.
+For example, read and program operations of an MLC device should be completed within 100 $\mu$s and 1,600 $\mu$s, respectively~\cite{MooresLaw_chien}.
+Moreover, even after 3,000 P/E cycles, it is required to support up to 400,000 read operations~\cite{MooresLaw_chien} as well as to retain its stored data for up to 1 year at $30\,^{\circ}\mathrm{C}$~\cite{Cox_JEDEC}.
+Since the \textit{Vth} design parameters shown in Figure~\ref{fig:Background_VthDistribution} are closely related to the NAND requirements, the overall \textit{Vth} distributions should be carefully designed to meet all the NAND requirements under the worst-case operating conditions for a storage product.
+
+
+The upper \textit{Vth} target {\small $V^{Erase}_{Verify}$} of the $E$ state is one of the key factors in determining the total width {\small$W_{Vth}$} of \textit{Vth} distributions.
+As {\small $V^{Erase}_{Verify}$} is lowered, {\small $W_{Vth}$} gets widened so that it is easier to optimize the \textit{Vth} parameters for higher performance or longer retention capability.
+However, as a side-effect of the lowered {\small $V^{Erase}_{Verify}$}, NAND endurance may deteriorate because NAND blocks are more deeply erased~\cite{DPES_jeong}.
+Conversely, when a higher {\small $V^{Erase}_{Verify}$} is used, designing \textit{Vth} distributions becomes more complex because less {\small $W_{Vth}$} is available.
+
+
+The width {\small $W_{Pi}$} of a \textit{Vth} distribution is mostly determined by the NAND write performance requirement.
+Since NAND flash memory generally uses the incremental step pulse programming (ISPP) scheme to form \textit{Vth} distributions, {\small $W_{Pi}$} and the program time are directly affected by the ISPP step control.
+For example, when a fine-grained ISPP step control is used for a program operation, {\small $W_{Pi}$} can be shortened while the program time increases~\cite{DPES_jeong}.
+As a result, {\small $W_{Pi}$} is determined by the minimum achievable width of a \textit{Vth} distribution under the given program-time requirement.
+
+
+The \textit{Vth} gap {\small $M_{Pi}$} between two adjacent states is mainly determined by the NAND retention requirement.
+When NAND memory cells are programmed and left for a long time, charge loss may occur because stress-induced damage in the tunnel oxide layer is likely to loosen stored charges.
+Since this charge-loss phenomenon may cause \textit{Vth} changes, it is necessary for a sufficient {\small $M_{Pi}$} to tolerate the \textit{Vth} changes.
+In order to guarantee the NAND retention requirement under the worst-case operating condition, {\small $M_{Pi}$} is determined by the maximum \textit{Vth} change after the maximum number of P/E cycles and the specified retention time.
+
+
+The \textit{Vth} gap {\small $M_{Dist}$} between the $E$ state and {\small $V_{Read}^{P1}$} primarily affects the program-disturbance resistance and read-disturbance resistance of NAND flash memory.
+When NAND memory cells are programmed or read, neighbor cells that belong to the $E$ state may be softly programmed so that their \textit{Vth}s move to the right~\cite{Flash_Brewer}\cite{BER_mielke}.
+In order to compensate for the \textit{Vth} changes due to these disturbances, a sufficient {\small $M_{Dist}$} should be reserved in the \textit{Vth} window as shown in Figure~\ref{fig:Background_VthDistribution}.
+Typically, {\small $M_{Dist}$} is decided by the \textit{Vth} changes after the maximum number of P/E cycles followed by the maximum number of read cycles.
+
+
+The read pass voltage {\small $V^{Pass}_{Read}$} which affects the NAND read disturbance is another key factor in deciding the value of {\small $W_{Vth}$}.
+Since the NAND read disturbance has an exponential dependence on the {\small$V^{Pass}_{Read}$}~\cite{ReadDisturb_Kang}, {\small $V^{Pass}_{Read}$} is usually fixed as low as possible in device design times.
+The \textit{Vth} gap {\small $M_{Pass}$} between the $P3$ state and {\small$V^{Pass}_{Read}$} is also essential to fully turn on all the NAND memory cells in a block~\cite{Flash_Brewer}.
+
+
+When the \textit{Vth} design parameters are designated accordingly, all the \textit{Vth} states are placed between {\small $V^{Erase}_{Verify}$} and {\small $V^{Pass}_{Read}$}.
+Therefore, the total width {\small $W_{Vth}$} of the \textit{Vth} window is expressed as follows (for an MLC NAND device):
+\begin{equation}\label{eq:Background_Wvth}
+\begin{split}
+W_{Vth} &= V^{Pass}_{Read} - V^{Erase}_{Verify} \\
+        &= M_{Dist} + \sum_{i=1}^{3} W_{Pi} + \sum_{i=1}^{3} M_{Pi} + M_{Read} .
+\end{split}
+\end{equation}
+Since the \textit{Vth} design parameters are highly related to one another, if a certain design parameter is to be changed, we should check its effect on the whole \textit{Vth} window.
+
+
+\section{NAND Program Operation}
+\label{sec:Background_NANDProgramOperation}
+
+In order to form a threshold voltage distribution within a desired region, NAND flash memory generally uses the incremental step pulse programming (ISPP) scheme.
+As shown in Figure~\ref{fig:Background_ISPP}, the ISPP scheme gradually increases the program voltage by the $V_{ISPP}$ step until all the memory cells in a page are located in a desired threshold voltage region.
+While repeating ISPP loops, once NAND cells are verified to have been sufficiently programmed, those cells are excluded from subsequent ISPP loops.
+
+
+\begin{figure}[!t]
+\centering
+%\includegraphics[scale=1.1]{./Figures/2_Background/ISPP_Operation.eps}
+\caption{A conceptual timing diagram of the ISPP scheme.}
+\label{fig:Background_ISPP}
+\end{figure}
+
+
+Since the program time is proportional to the number of ISPP loops (which are inversely proportional to $V_{ISPP}$), the program time $T_{PROG}$ can be expressed as follows:
+\begin{equation}\label{eq:Background_Tpgm}
+T_{PROG} \propto \frac{V_{PGM}^{end} - V_{PGM}^{start}}{V_{ISPP}}.
+\end{equation}
+
+
+Figure~\ref{fig:Background_TprogVispp} shows normalized $T_{PROG}$ variations over different $V_{ISPP}$ scaling ratios. (When a $V_{ISPP}$ scaling ratio is set to $x$\%, $V_{ISPP}$ is reduced by $x$\% of the nominal $V_{ISPP}$.)
+When a narrow threshold voltage distribution is needed, $V_{ISPP}$ should be reduced for a fine-grained control, thus increasing the program time.
+Since the width of a threshold voltage distribution is proportional to $V_{ISPP}$~\cite{ISPP_suh}, for example, if the nominal $V_{ISPP}$ is 0.5 V and the width of a threshold voltage distribution is reduced by 0.25 V, $V_{ISPP}$ also needs to be reduced by 0.25 V (i.e., a $V_{ISPP}$ scaling ratio is 0.5), thus increasing  $T_{PROG}$ by 100\%.
+
+
+\begin{figure}[!t]
+\centering
+%\includegraphics[scale=0.45]{./Figures/2_Background/ISPP_tPROG.eps}
+\caption{Normalized $T_{PROG}$ variations over different $V_{ISPP}$ scaling ratios.}
+\label{fig:Background_TprogVispp}
+\end{figure}
+
+
+\section{Related Work}
+\label{sec:Background_RelatedWork}
+
+
+Since the lifetime of SSDs is inversely proportional to the total written data $W_{day}$ per day and the write amplification factor $WAF$, existing lifetime-enhancing studies for SSDs have mainly focused on reducing $W_{day}$ or $WAF$.
+In this section, we briefly review typical examples of existing lifetime-enhancing techniques that reduce $W_{day}$ and $WAF$, and explain a device-level technique for improving NAND endurance.
+Finally, we describe one of the cross-layer optimization techniques for better SSD performance, which is an integral motivation behind our work.
+%one of the important motivations of our works.
+
+
+\subsection{System-Level SSD Lifetime Improvement Techniques}
+\label{subsec:Background_ExistingLifetimeEnhancingTechniques}
+
+
+\subsubsection{Data Compression Technique}
+
+In order to reduce $W_{day}$, many types of flash-aware data compression techniques have been proposed to reduce the logical amount of write traffic to NAND chips.
+For example, the compression-aware flash translation layer (CaFTL)~\cite{Compression_Lee} was suggested to make key FTL modules (e.g., address mapping table and garbage collector) compression-aware so that compression efficiency could be maximized.
+Figure~\ref{fig:RelatedWorks_CaFTL1} shows the overall architecture of CaFTL with a page mapping table and a specially-designed data structure (i.e., a data chunk table) for managing compressed data.
+
+
+\begin{figure}[h]
+\centering
+%\includegraphics[scale=0.27]{./Figures/2_Background/CaFTL1.eps}
+\caption{An overall organization of CaFTL.}
+\label{fig:RelatedWorks_CaFTL1}
+\end{figure}
+
+
+In order to mitigate page fragmentation issues, CaFTL temporarily stores compressed data in a data buffer, and flushes four stored pages to NAND flash memory simultaneously.
+After flushing, compression-related information as shown in Figure~\ref{fig:RelatedWorks_CaFTL1} is updated to the data chunk table.
+Based on the data chunk table, CaFTL efficiently handles read requests and finds the most appropriate victim block during garbage collection.
+Moreover, CaFTL monitors the compression-ratio changes of input data so that unnecessary compression is avoided.
+Although data compression is an effective solution for reducing $W_{day}$ in general, when poorly compressed data (e.g., multimedia data) are continuously incoming, the method's effectiveness in extending the SSD lifetime is significantly degraded.
+However, since our proposed techniques does not depend on data content, it can improve SSD lifetime even when all the requested data is not compressed.
+
+
+\subsubsection{Data Separation Technique}
+
+Since NAND flash memory does not allow \textit{in-place-updates}, unnecessary data copies occur during garbage collection so that the logical amount of written data is actually amplified by $WAF$.
+In order to minimize $WAF$, several flash optimization techniques (e.g., advanced mapping schemes, TRIM command and data separation techniques) have been introduced.
+For example, Hsieh \textit{et al.} suggested a multi-hash function based data separation technique for separating hot data (i.e., frequently updated data) and cold data (i.e., rarely updated data) with a reasonable hardware overhead~\cite{HotCold_Hsieh}.
+Since hot data are updated within a short time, if such hot data are aggregated in the same NAND block, there is a high probability that a dead block (i.e., a NAND block where all the pages are invalidated) or a near-dead block can be selected during garbage collection, thus reducing $WAF$.
+Figure~\ref{fig:RelatedWorks_MHF1} shows an example of the hot data identification process with $K$ independent hash functions to hash a given LBA into the multiple entries of an $M$-entry hash table~\cite{HotCold_Hsieh}.
+Whenever write requests are issed, each counter entry corresponding to a hashed value is incremented.
+In order to capture \textit{recent hot data}, all the counter entries are decayed every predefined number of input requests.
+If the $H$ most significant bits of every counter corresponding to $K$ hash functions contain a non-zero value, that LBA is classified as hot data.
+Although the main purpose of the data separation technique is quite different from our proposed technique, its ability to identify hot data can contribute to increasing the efficiency of the proposed lifetime improvement techniques.
+For example, if the data separator can accurately identify hot data, the retention-time requirements of such hot data can be relaxed because hot data will be updated in the near-future.
+
+
+\begin{figure}
+\centering
+%\includegraphics[scale=0.345]{./Figures/2_Background/HotCold.eps}
+\caption{Examples of the counter updating and the hot data identification of an LBA.}
+\label{fig:RelatedWorks_MHF1}
+\end{figure}
+
+
+\subsection{Device-Level Endurance-Enhancing Technique}
+\label{subsec:Background_ExistingEnduranceEnhancementTechnique}
+
+\begin{figure}[t]
+\centering
+%\includegraphics[scale=0.29]{./Figures/2_Background/SelfHealing.eps}
+\caption{Illustration of self-healing SSD and an example of self-healing process.}
+\label{fig:RelatedWorks_SelfHealing1}
+\end{figure}
+
+
+\begin{figure}[t]
+\centering
+%\includegraphics[scale=0.25]{./Figures/2_Background/SelfHealing2.eps}
+\caption{The effect of the self-heating on increasing $N_{P/E}^{max}$.}
+\label{fig:RelatedWorks_SelfHealing2}
+\end{figure}
+
+Wu \textit{et al.} presented a device-level endurance enhancement technique that boosts self-recovery speed by heating a flash chip under high temperature~\cite{SelfHealing_Wu}.
+Figure~\ref{fig:RelatedWorks_SelfHealing1} shows the self-healing SSD architecture and its self-healing process.
+When a sick chip (i.e., a NAND chip that is almost worn-out) is detected, its entire data is copied to the extra backup chip during device idle times.
+After data copy operations are completed, a sick chip is heated at $200\,^{\circ}\mathrm{C}$ for 35 minutes.
+Figure~\ref{fig:RelatedWorks_SelfHealing2} shows the effect of self-heating on increasing $N_{P/E}^{max}$.
+By leveraging the temperature-accelerated recovery, it improved the endurance of SSDs up to fivefold.
+A major drawback of this approach is that it requires extra energy consumption to heat flash chips and lowers the reliability of a storage
+device.
+Our proposed technique improves the endurance of NAND devices by lowering the erase voltage and slowing down the erase speed without any serious side effects.
+
+
+\subsection{Cross-Layer Optimization Techniques Exploiting NAND Tradeoffs}
+\label{subsec:Background_CrosslayerOptimizationTechniques}
+
+Liu \textit{et al.} proposed a retention relaxation technique to improve SSDs by relaxing their NAND retention capabilities~\cite{RetentionRelaxation_Liu}.
+This technique is motivated by their observation that in typical enterprise workloads, a considerable portion of written data to SSDs is likely to be updated soon (e.g., less than a day as shown in Figure~\ref{fig:RelatedWorks_RetentionRelaxation1}).
+Since this observed updated time is much shorter than the NAND retention-time specification (i.e., 1 year), the retention relaxation technique increases the ISPP step voltage so that the NAND write performance is increased while shortening the retention capability.
+
+
+\begin{figure}[t]
+\centering
+%\includegraphics[scale=0.255]{./Figures/2_Background/RetentionRelaxation1.eps}
+\caption{Example distributions of the data retention requirements.}
+\label{fig:RelatedWorks_RetentionRelaxation1}
+\end{figure}
+

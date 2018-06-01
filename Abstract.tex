@@ -1,0 +1,40 @@
+\begin{abstract}
+
+
+Replacing HDDs with NAND flash-based storage devices (SSDs) has been one of the major challenges in modern computing systems especially in regards to better performance and higher mobility.
+%for better performance as well as for higher mobility.
+Although uninterrupted semiconductor process scaling and multi-leveling techniques lower the price of SSDs to the comparable level of HDDs, the decreasing lifetime of NAND flash memory, as a side effect of recent advanced device technologies, is emerging as one of the major barriers to the wide adoption of SSDs in high-performance computing systems.
+
+
+In this dissertation, we propose new cross-layer optimization techniques to extend the lifetime (in particular, endurance) of NAND flash memory.
+Our techniques are motivated by our key observation that erasing a NAND block with a lower voltage or at a slower speed can significantly improve NAND endurance.
+However, using a lower voltage in erase operations causes adverse side effects on other NAND characteristics such as write performance and retention capability.
+The main goal of the proposed techniques is to improve NAND endurance without affecting the other NAND requirements.
+
+
+We first present Dynamic Erase Voltage and Time Scaling (DeVTS), a unified framework to enable a system software to exploit the tradeoff relationship between the endurance and erase voltages/times of NAND flash memory.
+DeVTS includes erase voltage/time scaling and write capability tuning, each of which brings a different impact on the endurance, performance, and retention capabilities of NAND flash memory.
+
+
+Second, we propose a lifetime improvement technique which takes advantage of idle times between write requests when erasing a NAND block with a slower speed or when writing data to a NAND block erased with a lower voltage.
+We have implemented a DeVTS-enabled FTL, called autoFTL, which optimally adjusts the erase voltage/time and write performance of NAND devices in an automatic fashion.
+Our experimental results show that autoFTL can improve NAND endurance by 62\%, on average, over DeVTS-unaware FTL with a negligible decrease in the overall write performance.
+
+
+Third, we suggest a comprehensive lifetime improvement technique which exploits variations of the retention requirements as well as the performance requirement of SSDs when writing data to a NAND block erased with a lower voltage.
+We have implemented dvsFTL, an extended version of autoFTL, which fully utilizes DeVTS by accurately predicting the write performance and retention requirements during run times.
+Our experimental results show that dvsFTL can further improve NAND endurance by more than 50\% over autoFTL while preserving all the NAND requirements.
+
+
+Lastly, we present a reliability management technique which prevents retention failure problems when aggressive retention-capability tuning techniques are employed in real environments.
+Our measurement results show that the proposed technique can recover corrupted data from retention failures up to 23 times faster over existing data recovery techniques.
+Furthermore, it can successfully recover severely retention-failed data, such as ones experienced 8 times longer retention times than the retention-time specification, that were not recoverable with the existing technique.
+%outperforms existing data recovery techniques in both the data recovery speed and the data recovery capability.
+
+
+Based on the evaluation studies for the developed lifetime improvement techniques, we verified that the cross-layer optimization approach has a significant impact on extending the lifetime of NAND flash-based storage devices.
+We expect that our proposed techniques can positively contribute to not only the wide adoption of NAND flash memory in datacenter environments but also the gradual acceleration of using flash as main memory.
+%the early realization of DRAM-Flash hybrid main memory systems.
+
+
+\end{abstract}
