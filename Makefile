@@ -24,3 +24,6 @@ clean:
 	rm -f ./${MAIN}.pdf
 	rm -f ./${MAIN}.log
 	rm -f ./${MAIN}.aux
+	rm -f ./${MAIN}.lo*
+	rm -f ./${MAIN}.toc
+	rm -f ./${MAIN}.idx
