@@ -1,0 +1,14 @@
+#compiled source #
+.aux
+.aux~
+.dvi
+.ps
+.log
+.tex~
+.pdf
+.idx
+.lof
+.toc
+.lot
+.gz
+
