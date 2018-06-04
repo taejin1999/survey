@@ -1,3 +1,675 @@
 \chapter{FineDedup} 
 \label{chap:FineDedup}
 
+\section{Introduction}
+As the price-per-byte of NAND flash memory is rapidly decreasing,
+NAND flash-based solid-state drives (SSDs) are emerging as a viable high-performance storage solution
+for laptops, desktop PCs and high-performance enterprise systems.
+%The poor write endurance of NAND flash memory, however, is emerging as one of the main obstacles 
+%for wider adoption of SSDs in various computing environments.
+%In NAND flash memory, reads and writes are performed in a unit of a page.
+%Because of its `erase-before-write' nature,
+%a block consisting of multiple pages must be erased before programming (or writing) new data to it.
+%Unfortunately, as the semiconductor process is scaled down and the multi-level cell (MLC) technology is introduced,
+However, as NAND flash memory technology scales down to 20-nm and below, storing data reliably in NAND flash memory
+gets a key design challenge of NAND-based storage systems. 
+For example, the number of program/erase (P/E) cycles allowed for each block is significantly reduced in recent triple-level cell (TLC)
+NAND technology.
+While older 5x-nm single-level cell (SLC) NAND flash memory can support about 10 K P/E cycles, recent 2x-nm TLC NAND flash memory
+can barely support about 1 K P/E cycles~\cite{tlc}.
+%the number of P/E cycles is reduced to 3K~\cite{mlc1}. %~\cite{mlc1,mlc2}.
+%As a result, the reduction in the number of P/E cycles seriously limits the overall lifetime of flash-based SSDs.
+The reduction in the number of P/E cycles seriously limits the overall lifetime of flash-based SSDs,
+making it difficult for SSDs to be used in general computing environments.
+
+In order to extend the lifetime of flash-based SSDs,
+data deduplication techniques have been used in recent SSDs
+because they are effective in reducing the amount of data written to flash memory by preventing duplicate data from being written again~\cite{caftl,value-locality}.
+As a result, only non-duplicate data, i.e., unique data, are stored in SSDs effectively decreasing the total amount of data written to
+SSDs.
+In most deduplication schemes proposed for SSDs,
+the unit of data deduplication is same as the flash page size which is usually 4 KB or 8 KB.
+Using a page as a deduplication unit seems to be reasonable 
+because the unit of a read or write operation of flash memory is also a page. 
+However, this page-based deduplication technique misses many chances of eliminating duplicate data, especially
+when two pages are \textit{almost} identical.
+For example, in our experimental analysis of an existing 4 KB page-based deduplication technique, we observed that
+up to 34\% mostly identical data.
+If the unit of deduplication were smaller than 4 KB, about 23\% more data could be identified as duplicate data.
+%We observed that up to 48\% of unique pages actually contain mostly identical data.
+%The existing techniques, however, can not completely eliminate the duplicate segment in those pages 
+%since they are considered as unique pages.
+Furthermore, it is expected that the effectiveness of the page-based deduplication technique would 
+get even worse in future NAND flash memory as the page size of 
+flash memory is expected to increase
+to a bigger size such as 16 KB~\cite{16kpage}.
+%In our observation, many pages are rewritten to flash memory after being modified slightly.
+%Thus, the contents of the previous page and the new one are nearly identical.
+%{\color{red}In our observation, however,
+%this page-based deduplication loses many chances of eliminating duplicate data because of following two reasons.
+%( ).}
+
+%In order to extend the limited lifespan, data deduplication technique, which removes redundant data from the workload,
+%has been widely adopted in SSDs. 
+%In the existing scheme, the size of a chunk, which is used as a unit of redundancy checking and writing, is commonly 
+%fixed to the page size of the flash memory to minimize the additional management overhead.
+%Using page-sized chunking method, however, slightly modified data chunk can not be determined as duplicated data although
+%most of data in the chunk are the same, i.e. \textit{partially matched data}.
+%Furthermore, the portion of \textit{partially matched data} is expected to be even significantly larger when the flash page size 
+%becomes bigger as the semiconductor technology scales down.
+%For example, the page size of initial SLC flash memory was 2KB.%~\cite{2kpage}. 
+%The 4KB-sized page has become more common in both industry and research in the late 2000s.%~\cite{4kpage1,4kpage2,4kpage3}. 
+%In the early 2010s, the scaling trend has been accelerated so 
+%that the flash page size has become 8KB%~\cite{8kpage1,8kpage2} 
+%and even 16KB. %~\cite{16kpage}. 
+%Under the \textit{large-page} flash memory, the existing deduplication techniques
+%for SSDs have unavoidable limitations since the probability of finding pages with an exact match will be significantly low.
+
+In this paper, 
+we propose a fine-grained deduplication technique for flash-based SSDs, called \textit{FineDedup}.
+The proposed FineDedup technique is different from other existing deduplication techniques
+in that it increases the likelihood of finding duplicates
+by using a finer deduplication unit
+which is smaller than a single page (e.g., one fourth of a single page).
+With a smaller deduplication unit,
+many data segments within a page can be detected as a duplicate one, 
+so the amount of data written to flash memory can be reduced regardless of a physical page size.
+
+In order to effectively incorporate fine-grained deduplication into flash-based SSDs,
+two key technical issues must be addressed properly.
+First, fine-grained deduplication requires a larger memory space than a coarse-grained one 
+because it needs to keep more metadata in memory to find small-size duplicate data.
+Second, in fine-grained deduplication, 
+unique data segments from partially duplicated pages can be scattered across several physical pages,
+which may seriously degrade the overall read performance.
+The proposed FineDedup technique is designed to take full advantage of fine-grained deduplication
+with small memory overhead as well as a low read performance penalty.
+Our evaluation results show that 
+FineDedup prolongs the lifetime of SSDs by up to 37\% over page-based deduplication
+while requiring a negligible memory space increase.
+This improvement comes with a less than 5\% read performance penalty over page-based deduplication.
+
+The rest of the paper is organized as follows. 
+In Section 2, we briefly review the existing deduplication techniques for SSDs.
+The main motivation of FineDedup is presented in Section 3.
+We describe the proposed FineDedup technique in detail in Section 4,
+and then evaluate its effectiveness using real-world traces in Section 5. 
+Finally, Section 6 concludes with a summary.
+
+\section{Related Work}
+%The most well-known approach that improves the storage lifetime is to optimize flash firmware algorithms. 
+%As mentioned previously, 
+Because of the ``erase-before-write'' nature of NAND flash memory, 
+flash storage devices employ a flash translation layer (FTL) 
+that supports address mapping, garbage collection, and wear-leveling algorithms~\cite{FAST}. %~\cite{BAST,FAST,LAST}.
+These firmware algorithms incur a lot of extra write/erase operations,
+seriously shortening the overall lifetime of a storage device.
+For this reason, a large number of studies have been focused on reducing such extra operations to improve the storage 
+lifetime.
+%The firmware-level optimization has been effective in improving the lifetime of flash-based SSDs. 
+However, considering the decreasing lifetime of recent high-density NAND flash memory such as TLC NAND flash memory~\cite{tlc}, %~\cite{mlc1,mlc2}, 
+more aggressive lifetime management solutions are required. 
+
+Data deduplication techniques, which are originally developed for backup systems,
+are regarded as one of the promising approaches for extending the storage lifetime
+because of their ability that reduces the amount of write traffic sent to a storage device.
+In deduplication techniques, a chunk is used as an unit of identification and elimination of duplicate data.
+%An unit of verification of duplicate and elimination is called chunk in deduplication techniques.
+Depending on their chunking strategies, deduplication techniques can be categorized into two types,
+fixed-size deduplication and variable-size deduplication.
+Fixed-size deduplication divides an input data stream into fixed-size chunks (e.g., pages)~\cite{caftl,value-locality}. %~\cite{caftl,value-locality,idedup}.
+Then, it decides if each chunk data is duplicate and prevents duplicate chunks %whose data are already stored in flash memory 
+from being rewritten to flash memory.
+Unlike fixed-size deduplication, 
+the chunk size of variable-size deduplication is not fixed.
+Instead, it decides a cut point between chunks using 
+a content-defined chunking (CDC) algorithm
+which divides the data stream according to the contents~\cite{dedupv1, dong}.
+
+% SSD의 경우 fixed-size dedup을 할 수 밖에 없음을 강조
+In general, variable-size deduplication techniques can identify more data as duplicate data than the fixed-size deduplication technique.
+Since variable-size deduplication adaptively changes the size of chunks by analyzing the contents of input stream,
+duplicate data are more effectively found regardless of their locations.
+In spite of its advantages, variable-size deduplication is not commonly used in SSDs because of the following practical limitations.
+First, variable-size deduplication often requires
+the entire data contents to be available.
+Therefore, it is commonly adopted at the level of operating systems or file systems.
+Second, the CDC algorithm often requires relatively high computational power and a large amount of memory space.
+Thus, variable-size deduplication is not appropriate to be employed at the level of storage devices
+where computing and memory resources are constrained.
+Lastly, the size of remaining unique data after deduplication may vary in variable-size deduplication.
+When writing those data, a complicated scheme for data size management is required to form sub-page
+data chunks to fit in a flash page size, preventing an internal fragmentation.
+For those reasons, most existing deduplication techniques for SSDs employ fixed-size deduplication, 
+which is relatively simple and does not require a significant amount of hardware resources.
+
+Similar to the existing deduplication techniques,
+the proposed FineDedup technique is also based on fixed-size deduplication.
+Using a smaller deduplication unit,
+however, FineDedup improves the likelihood of eliminating duplicate data.
+This approach can complement the limitation of existing fixed-size deduplication techniques,
+which exhibit a relatively low amount of removed writes 
+in comparison with variable-size deduplication.
+
+\section{Motivations}
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.6]{figure/finededup/dupChunkperReq}
+	\caption{The percentage of pages according to their partial duplicate patterns.} % ok
+	\label{fig:percentage}
+\end{figure}
+
+Existing deduplication techniques for SSDs use a single page as a chunk for data deduplication~\cite{caftl,value-locality}.
+When a write-requested page is the exact duplicate of a previously written page, 
+the requested page is not written to flash memory; only the corresponding entry for a mapping table (between the
+logical address and physical address) is updated.
+On the other hand, if there is no existing page duplicate in flash memory whose contents are the same as those of requested one,
+the requested page has to be written to flash memory.
+However, even for these unique pages, if we check their redundancy at a sub-page level, say at a quarter of the page size,
+many sub-pages of these unique pages can be identified as redundant data.
+In existing techniques based on page-level deduplication, therefore, many duplicate data are written to flash memory even though 
+the same data chunks have already been written.
+
+In order to better understand the effect of fine-grained deduplication on the amount of identified duplicate data,
+we analyzed how many more chunks can be identified as redundant 
+when the chunk size gets smaller than a single page.
+For our evaluation, we used five I/O traces, \texttt{PC}, \texttt{Sensor}, \texttt{Synth}, \texttt{Install}, and \texttt{Update} which are 
+explained in Section 5.
+%collected from a desktop PC and a number of server systems used for a hardware synthesis, and a sensor data analysis.
+In our evaluation, the page size was 4 KB and the chunk size was set to 1 KB.
+Fig.~\ref{fig:percentage} shows the percentage of the page writes from host, classified by their partial duplicate patterns.
+We denote that a page is a n/4-duplicate page when n chunks of the page are duplicate chunks.
+A 4/4-duplicate page is a duplicate page at the page level.
+In the existing page-based deduplication, only 4/4-duplicate pages can be identified as a duplicate page.
+As shown in Fig.~\ref{fig:percentage}, 4/4-duplicate pages account for only 8\% - 28\% of total requested pages.
+%However, for partially duplicate pages where the number of duplicate chunks within a requested page is between 1 and 3,
+For partially duplicate pages, i.e., 1/4-, 2/4- and 3/4-duplicate pages, the page-based deduplication technique is useless.
+As shown in Fig.~\ref{fig:percentage},
+pages with 1-3 duplicate chunks account for 14\% - 34\%.
+This means that many duplicate data are unnecessarily written to flash memory
+due to the large chunk size.
+%when the size of a chunk is large.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=1]{figure/finededup/nonDuplicatedData_ChunkSize}
+	\caption{The amount of written data under varying chunk sizes in \texttt{PC} workload.} % ok
+	\label{fig:chunksize}
+\end{figure}
+
+We also investigated the amount of data that can be eliminated by data deduplication 
+while varying the chunk size from 256 B to 8 KB.
+As shown in Fig.~\ref{fig:chunksize}, 
+when the chunk size is 1 KB, 
+the amount of data written to flash memory is reduced by 33\% over when the chunk size is 4 KB.
+In particular, when the size of a chunk is 8 KB (i.e., when the physical page size is assumed to be 8 KB),
+only 10\% of requested data are eliminated by data deduplication.
+This effectively shows that, as the size of a page increases,
+the overall deduplication ratio, i.e., the percentage of identified duplicate writes, decreases significantly.
+Since the physical page size of NAND flash memory is expected to increase as the semiconductor process is scaled down~\cite{tlc,16kpage},
+it is expected that the deduplication ratio of the existing deduplication technique will be significantly 
+decreased in near future.
+In order to resolve this problem, the deduplication chunk size of deduplication techniques needs to be smaller than a page size.
+As depicted in Fig.~\ref{fig:chunksize}, 
+the deduplication ratio is saturated when the chunk size is 1 KB.
+Thus, we use it as a default chunk size in the rest of this paper.
+
+\section{Fine-Grained Deduplication}
+
+In this section, we describe our proposed FineDedup technique in detail.
+We first explain the overall architecture of FineDedup and 
+describe how FineDedup handles read and write requests in Section 4.1.
+In Section 4.2 and 4.3,
+we introduce a read performance penalty and memory overheads caused by FineDedup, respectively,
+and explain how these problems can be resolved in FineDedup.
+
+\subsection{Overall Architecture of FineDedup}
+
+Fig.~\ref{fig:overview} shows an overall architecture of FineDedup with its main components.
+Upon the arrival of a write request,
+FineDedup stores requested data temporarily in an on-device buffer,
+which is managed by an LRU algorithm.
+When the requested data are evicted from the buffer,
+FineDedup divides the data into several chunks.
+(Note that the chunk size is 1 KB in this work, 
+but a different size of chunks can be used as well in FineDedup.)
+
+For each chunk, FineDedup computes a fingerprint, using a collision-resistant hash function.
+In this work, we use an MD6 hash function~\cite{md6}, which is one of the well-known cryptographic hash functions.
+A fingerprint is used as a unique ID that represents the contents of a chunk.
+FineDedup has to compute more fingerprints than the existing deduplication schemes
+because of its small chunk size.
+To reduce the hash calculation time,
+FineDedup uses multiple hardware-assisted hash engines for parallel hash calculations. 
+In our FPGA (ML605) implementation of the MD6 hash function, it took about 10 $\mu$s to compute a fingerprint using a hardware accelerator.
+Considering a long write latency (e.g., 1.2 $m$s) of NAND flash memory,
+the time overhead of computing fingerprints can be considered negligible.
+
+After fingerprinting, 
+each fingerprint is looked up in the dedup table
+which maintains the fingerprints of the unique chunks previously written to flash memory.
+Each entry of the dedup table is composed of a key-value pair, \{\textit{fingerprint}, \textit{location}\},
+where the location indicates a physical address in which the unique chunk is stored.
+If the same fingerprint is found,
+it is not necessary to write the chunk data
+because the same chunk is already stored in flash memory.
+Instead, FineDedup updates the mapping table 
+so that the corresponding mapping entry points to the unique chunk previously written.
+Unlike existing page-based deduplication techniques,
+FineDedup handles all the data in the unit of a chunk.
+%For this reason, FineDedup must maintain a chunk-level mapping table,
+%which is much larger than the existing page-level mapping table.
+For this reason, FineDedup must maintain a chunk-level mapping table
+that maps a logical chunk address to a physical chunk in flash memory.
+Because of its finer mapping granularity,
+the chunk-level mapping table is much larger than the existing page-level mapping table.
+To reduce the memory space for maintaining the chunk-level mapping table,
+FineDedup uses a hybrid mapping strategy,
+which is described in Section 4.3 in detail.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.4]{figure/finededup/overview}
+	\caption{An overview of the proposed FineDedup technique.} % ok
+	\label{fig:overview}
+\end{figure}
+
+If there is no matched fingerprint in the dedup table,
+FineDedup stores the chunk data in a \textit{chunk buffer} temporarily.
+This temporary buffering is necessary 
+because the unit of I/O operations of flash memory is a single page.
+The chunk buffer stores the incoming chunk data until there are four chunks,
+and evicts them to flash memory at once.
+FineDedup then updates the mapping table 
+so that the corresponding mapping entries indicate newly written chunks.
+The new fingerprints of the evicted chunks are finally inserted into the dedup table with their physical location.
+
+When a read request arrives,
+FineDedup reads all the chunks that belong to the requested page from flash memory,
+and then transfers the read data to the host system.
+The physical addresses of the chunks can be obtained by consulting to the mapping table.
+In FineDedup, four chunks in the same logical page can be scattered across different physical pages.
+In that case, multiple read operations are required to form the original page data,
+which in turn significantly increases the overall read response time.
+We explain how FineDedup resolves this problem in the following subsection.
+
+\subsection{Read Overhead Management}
+
+FineDedup effectively reduces the number of pages written to flash memory
+by using a small-size chunk for deduplication,
+but it incurs two types of additional overheads, i.e.,
+a read performance overhead and a memory space overhead,
+which are not observed in the existing deduplication techniques.
+In this subsection, 
+we first introduce why the read performance overhead occurs in FineDedup,
+and then explain how FineDedup resolves this problem.
+In the following subsection, 
+we describe our memory space overhead reduction technique in detail.
+
+The main cause of the read performance degradation is data fragmentation
+which occurs when data chunks belonging to the same logical page are broken up into several physical pages.
+Fig.~\ref{fig:readoverhead} illustrates why data fragmentation occurs in FineDedup.
+There are two page write requests, \textit{Req 1} and \textit{Req 2}, in Fig.~\ref{fig:readoverhead}.
+\textit{Req 1} consists of four chunks, `A', `B', `C', and `D', 
+and \textit{Req 2} is also composed of four chunks, `E', `F', `G', and `H'.
+Since `A' and `B' of \textit{Req 1} are duplicate chunks,
+only `C' and `D' need to be written to flash memory.
+%Thus, we can reduce writes for two chunks `A' and `B'.
+Suppose that there is a read request for the page data written by \textit{Req 1}.
+%after the chunks of \textit{Req1} are written to flash memory.
+In that case, FineDedup has to read three pages, i.e., \textit{page 1}, \textit{page 2}, and \textit{page 3}, from flash memory
+to form the requested data.
+%to form the requested data of \textit{Req1}, incurring a significant read performance penalty.
+The read performance penalty can also occur even when there are no duplicate chunks in the requested page.
+For example, in Fig.~\ref{fig:readoverhead}, 
+\textit{Req 2} has no duplicate chunks in flash memory,
+thus all the chunks belonging to \textit{Req 2} being written to flash memory.
+Because a single page write requires four data chunks, 
+`E' and `F' of \textit{Req 2} are written to \textit{page 3} together with `C' and `D',
+and `G' and `H' will be written to \textit{page 4} with other data chunks, as shown in Fig.~\ref{fig:readoverhead}.
+Thus, when the data written by \textit{Req 2} are read later, 
+both \textit{page 3} and \textit{page 4} must be read from flash memory.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.4]{figure/finededup/readoverhead}
+	\caption{Data fragmentation caused by FineDedup.} % ok
+	\label{fig:readoverhead}
+\end{figure}
+
+
+One of the feasible approaches that mitigate the read performance overhead is to employ a chunk read buffer.
+In our observation, 
+the access frequencies of unique chunks are greatly skewed;
+that is, a small number of popular chunks account for a large fraction of the total accesses to unique chunks in flash memory.
+For example, according to our analysis under real-world workloads, 
+top 10\% of the unique chunks serve more than 70\% of the total data read by a host system.
+By keeping frequently accessed chunks in a chunk read buffer,
+therefore, FineDedup can reduce a large number of page read operations sent to flash memory.
+
+On the other hands, we have observed that about 39\% of read requests to unique pages actually requires two page read operations.
+In order to further reduce this read performance penalty,
+FineDedup uses a chunk packing scheme.
+The key idea of this scheme is to
+group chunks belonging to the same logical page in a chunk buffer and 
+then write them to the same physical page together.
+Fig.~\ref{fig:chunkbuffer} shows an example of our chunk packing scheme
+when three page write requests, \textit{Req 1}, \textit{Req 2}, and \textit{Req 3}, are consecutively issued from a host system.
+\textit{Req 1} contains two duplicate chunks `A' and `B' and two unique chunks `C' and `D'.
+As expected, only `C' and `D' out of four chunks are sent to the chunk buffer.
+The next request \textit{Req 2} does not have any duplicate chunks,
+so all of them are moved to the chunk buffer.
+As depicted in Fig.~\ref{fig:chunkbuffer},
+the chunks `E', `F', `G', and `H' belong to the same logical page and form single page data.
+Thus, FineDedup writes them to flash memory together,
+leaving the chunks `C' and `D' in the chunk buffer.
+When \textit{Req 3} is issued with two more unique chunks `I' and `J', 
+`C' and `D' along with `I' and `J' are written to flash memory.
+All those chunks can be written to the same physical page together
+because every chunk of each request is not broken up into two pages.
+
+Note that the main objective of this scheme is to prevent chunks of a unique request to be scattered across multiple pages 
+avoiding unnecessary data fragmentation.
+%In order to directly insert a incoming unique request to chunk buffer,
+%page-sized free space is managed to be always available in the buffer.
+When there is no free space for the next request and no suitable chunks of requests to form a single page,
+the chunks of a partially duplicate request is broken up into two pages.
+Most partially duplicated requests, however, are 3/4-Duplicate pages as shown in Fig.~\ref{fig:percentage}, which means 
+there are many requests of one unique chunk in the chunk buffer.
+Therefore, we can expect that most requests will be written to the same page even when the size of the chunk buffer is not large 
+since it is not quite difficult to find an appropriate chunk to fit a flash page.
+%In the above example, if we assume the chunk buffer can contain 8 chunks and \textit{Req 3} has three unique chunks,
+%only two chunks of \textit{Req 3} will be written along with existing chunks, `C' and `D', leaving the other chunk in chunk buffer.
+%A large chunk buffer provides more chance to avoid the request scattering.
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.4]{figure/finededup/chunkbuffer}
+	\caption{A packing scheme in the \textit{chunk buffer}.} % ok
+	\label{fig:chunkbuffer}
+\end{figure}
+
+
+%%%%% NEED TO BE EXPLAINED!!! POWER FAILURE 시 partial chunks 'C', 'D' 가 power-off recovery 될 수 있음. => reliability 관리  %%%
+Remaining data in the chunk buffer could be lost when a power failure occurs.
+Recent enterprise SSDs, such as SM825 model manufactured by Samsung, have a large SDRAM cache (e.g., 256 - 512 MB) and use it as a device buffer.
+Moreover, they support internal cache power protection through the use of capacitors to flush out information in DRAM to flash memory 
+at the event of power failure~\cite{sm825}.
+In order to keep the reliability in FineDedup, the remaining data in the chunk buffer can be stored to flash memory 
+during power protection procedure as well as the mapping information of the written page.
+%In conclusion for chunk buffer design, there is a trade-off between potential read performance and reliability depending on the chunk buffer size.
+%#The size of the chunk buffer, hence, should be determined according to the characteristics of workloads.
+
+\subsection{Memory Overhead Management}
+
+As mentioned in Section 4.1,
+FineDedup handles requested data in the unit of a chunk.
+Therefore, FineDedup must maintain a chunk-level mapping table
+that maps a logical chunk address to a physical chunk address in flash memory.
+Since the size of a chunk is smaller than that of a page,
+a chunk-level mapping table is much larger than the page-level mapping table.
+For example, suppose that the page size is 4 KB and the chunk size is 1 KB.
+In that case, the size of a chunk-level mapping table is four times larger than that of a page-level mapping table.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.5]{figure/finededup/hybridmapping_1}
+	\caption{An overview of the demand-based hybrid mapping table.} % ok
+	\label{fig:hybridmapping}
+\end{figure}
+
+In order to reduce the amount of memory space required for a mapping table,
+FineDedup employs a hybrid mapping table
+which is composed of two types of mapping tables:
+a page-level mapping table and a chunk-level mapping table.
+As depicted in Fig.~\ref{fig:percentage}, 
+duplicate pages and unique pages still account for a considerable proportion of the total written pages.
+%for writing by a host system.
+For these pages, the page-level mapping table is more appropriate 
+because they can be directly mapped to corresponding pages in flash memory.
+The chunk-level mapping table is required only for partially duplicate pages.
+
+Fig.~\ref{fig:hybridmapping} shows the overall architecture of the hybrid mapping table used in FineDedup.
+The primary mapping table (PMT) is maintained in the page level 
+while the secondary mapping table (SMT) is maintained in the chunk level.
+The entry of the PMT is either a physical page address (PPA in Fig.~\ref{fig:hybridmapping}) in flash memory or 
+an index of the SMT (chunk address (CA) in Fig.~\ref{fig:hybridmapping}). 
+
+%%%%%
+%만약 request의 mapping 이 chunk 수준으로 관리될 필요가 없으면, 즉, unique page or fully duplicated page,  
+If the chunk-level mapping is not necessary for a requested page, for example, unique page or duplicate page,
+the corresponding entry of the PMT directly points to the physical address of the 
+newly written page or existing unique page in flash memory, respectively.
+%%%%%
+%If the requested page is a duplicate one, 
+%the corresponding entry of the primary mapping table directly points to the physical address of the existing unique page 
+%in flash memory.
+%Similarly, if the requested page is unique one, the corresponding entry of the primary mapping table is 
+%updated to point to the newly written unique page.
+%%%%
+On the other hand, if a partially duplicate page is requested for writing, 
+FineDedup allocates a new entry in the SMT.
+As depicted in Fig.~\ref{fig:hybridmapping},
+each entry of SMT is composed of four fields, each of which points to the physical chunk address 
+in flash memory.
+FineDedup then updates the new entry so that each field points to the physical chunk address.
+The corresponding entry of the PMT indicates the newly allocated entry of the SMT.
+
+Using the hybrid mapping table, 
+FineDedup can reduce the amount of memory space for keeping a mapping table.
+However, the problem of this hybrid mapping approach is that 
+the size of a mapping table can greatly vary according to the characteristics of workloads.
+For example, if some workloads have many partially duplicate pages, 
+the size of the SMT gets too big.
+On the other hand, if workloads mostly have unique pages or duplicate pages, 
+the it can be very small.
+Thus, the hybrid mapping table cannot be directly adopted in real SSD devices whose DRAM size is usually fixed.
+To overcome such a limitation, 
+FineDedup adopts a demand-based mapping strategy in which
+the entire chunk-level mapping table is stored in flash memory
+while caching only a fixed number of popular entries in DRAM memory.
+The \textit{Cached PMT} and \textit{Cached SMT} in Fig.~\ref{fig:hybridmapping} represents the cached versions of the
+PMT and SMT, respectively.
+
+It has been known that the demand-based mapping requires extra page read and write operations~\cite{dftl}.
+For instance,
+if a mapping entry for a chunk to be read is not found in the in-memory mapping table,
+that entry must be read from flash memory while evicting a victim entry to flash memory.
+The temporal locality present in workload, however, helps keep the number of extra operations small.
+The mapping information of requests issued in similar times will be stored in the same flash page.
+Once a mapping page is loaded in memory, hence,
+most requests issued in similar times are serviced from the mappings in memory.
+
+\section{Experimental Results}
+
+\begin{table}[t]
+	\renewcommand{\tabcolsep}{1.4mm} 
+	\centering
+	\begin{tabular}{c|c|c|c}
+		\hline
+		\multirow{2}{*}{Trace} 		& \multirow{2}{*}{Description} 		& Amount of 	& Amount of \\
+							   		& 			 				  		& Writes 		& Reads \\
+		\hline
+		\hline
+		\multirow{2}{*}{\texttt{PC}} 		& Web surfing, emailing and 		& \multirow{2}{*}{3.1 GB} 	& \multirow{2}{*}{40 MB} \\
+									   	   	& editing document, etc.    		& 						 	& 						  \\
+		\hline
+		\multirow{2}{*}{\texttt{Sensor}}    	& Storing semiconductor 		& \multirow{2}{*}{2.6 GB} 	& \multirow{2}{*}{66 KB} \\
+											   	& fabrication sensor data  		& 							& 					   \\
+
+		\hline
+		\multirow{2}{*}{\texttt{Synth}} 	   	& Synthesizing 	  					& \multirow{2}{*}{2.5 GB} 	& \multirow{2}{*}{70 MB} \\
+											   	& hardware modules 					&   						& 						  \\
+
+		\hline
+		\multirow{2}{*}{\texttt{Install}} 	 & Installing \& executing 			& \multirow{2}{*}{4.9 GB} 	& \multirow{2}{*}{119 MB} \\
+										   	 & programs (office, DB)			& 						   	& 					   \\
+
+		\hline
+		\multirow{2}{*}{\texttt{Update}} 	 & Updating \& downloading 			& \multirow{2}{*}{3.5 GB} 	& \multirow{2}{*}{103 MB} \\
+										   	 & software packages				& 						   	& 					   \\
+
+		\hline
+		\multirow{2}{*}{\texttt{M-media}} 	& Downloading \& playing 			& \multirow{2}{*}{3.2 GB} 	& \multirow{2}{*}{36 MB} \\
+					 					 	& multimedia files		   			& 						 	&		   				   \\
+		\hline
+	\end{tabular}
+	\caption{A summary of traces used for experimental evaluations.}
+	\label{tab:traces}
+\end{table}
+
+
+In this section, 
+we first describe our experimental settings and explain the benchmarks used for our evaluation in detail.
+We then assess the effect of the proposed FineDedup technique on the SSD lifetime.
+Finally, we analyze the read performance penalty and the memory overhead caused by FineDedup.
+%{\color{blue}We then analyze the benefit of the proposed FineDedup technique over the existing deduplication technique 
+%in terms of the SSD lifetime and overheads such as the additional read operation and the required memory size.}
+
+\subsection{Experimental Settings}
+
+In order to evaluate the effectiveness of FineDedup, 
+we performed our experiments using a trace-driven simulator with the I/O traces collected under various applications.
+The trace-driven simulator modeled the basic operations of NAND flash memory, 
+such as page read, page write and block erase operations,
+and included several flash firmware algorithms, 
+such as garbage collection and wear-leveling.
+The proposed FineDedup technique and the existing deduplication techniques were also implemented in our simulator.
+
+For trace collection, 
+we modified the Linux kernel 2.6.32 and collected I/O traces at the level of a block device driver.
+All the I/O traces include detailed information about the I/O commands sent to a storage device
+(e.g., the type of requests, logical block addresses (LBA), the size of requests, etc.) 
+as well as the contents of the data sent to or read from a storage device.
+We recorded I/O traces while running various real-world applications.
+The detailed descriptions of these I/O traces are summarized in Table~\ref{tab:traces}.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.75]{figure/finededup/dataReduction_Chunksize_less}
+	\caption{The amount of written data under various schemes.} % ok
+	\label{fig:reducedData}
+\end{figure}
+
+\subsection{Effectiveness of FineDedup}
+
+Fig.~\ref{fig:reducedData} shows the amount of data written to flash memory by FineDedup over the existing scheme.
+The results shown in Fig.~\ref{fig:reducedData} are normalized to \textit{RAW\_req},
+which represents the total amount of data written to flash memory without data deduplication.
+We assume the page-based deduplication technique as a baseline case.
+The baseline is denoted by \textit{BL\_4KB} for a 4 KB flash page and \textit{BL\_8KB} for a 8 KB flash page.
+Our FineDedup technique is denoted by \textit{FD\_4KB} and \textit{FD\_8KB} for a 4 KB flash page and 
+a 8 KB flash page, respectively.
+The chunk size in FineDedup is set to 1 KB for a 4 KB flash page and 2 KB for a 8 KB flash page.
+
+As we can see in Fig.~\ref{fig:reducedData}, 
+the effectiveness of deduplication techniques is highly workload-dependent. 
+The amount of data eliminated by the deduplication technique notably increases 
+when FineDedup is applied in most of the traces except \texttt{M-media}.
+%as the chunk size decreases in three traces, i.e., \texttt{PC}, \texttt{Sensor}, and \texttt{Synth}. 
+When we set the chunk size to one fourth of the flash page size, 
+FineDedup removes on average 16\% more duplicate data 
+over \textit{BL\_4KB} for a 4 KB flash page.
+For a 8 KB flash page, 
+it removes more duplicate data, on average by 23\% over the existing technique.
+For \texttt{PC}, FineDedup saves 37\% flash writes over \textit{BL\_8K}.
+As expected, the benefit of FineDedup mainly derives from the decreased chunk size 
+because it increases the probability of finding and eliminating duplicate data.
+Especially, \texttt{PC} trace shows a large number of update requests with little different data, so FineDedup can effectively 
+identify unchanged data as duplicate while existing deduplication technique regards as unique data.
+For the \texttt{M-media} trace, 
+it is extremely difficult to find duplicate data because the data were already highly compressed.
+Thus, both the existing deduplication techniques and FineDedup are not effective in reducing the 
+amount of data written to flash memory.
+
+\subsection{Read Overhead Evaluation}
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.75]{figure/finededup/increasedPageRead}
+	\caption{The number of page read operations.} % ok
+	\label{fig:pageread}
+\end{figure}
+
+As explained in Section 4.2, 
+%subpage chunking in FineDedup increases the number of page read operations. 
+fine-grained chunking in FineDedup increases the number of page read operations. 
+%In FineDedup, we have have proposed the optimization techniques, such as the packing scheme and the chunk read buffer,
+%to reduce additional page read operations.
+Fig.~\ref{fig:pageread} shows the normalized number of page read operations compared with the number of read requests
+in the workloads.
+\textit{RAW\_Req} indicates the number of original page read requests and \textit{BL} refers to the number of page
+read operations of the baseline FineDedup without employing proposed optimization schemes. 
+\textit{BL+PS}, \textit{BL+RB} and \textit{BL+PS+RB} indicate the number of page reads of FineDedup with the proposed
+packing scheme, the chunk read buffer, and both, respectively. 
+The size of the chunk read buffer was set to 8 MB and the chunk buffer size was set to 200 KB.
+
+As shown in Fig.~\ref{fig:pageread}, employing the chunk read buffer is more effective than the packing scheme 
+for reducing additional page read operations in most workloads. This is because the packing scheme is only
+effective for the requests containing no duplicate chunks whereas the chunk read buffer can absorb most of the read requests 
+to frequently accessed chunks.
+FineDedup with both the packing scheme and chunk read buffer incurs on average less than 5\% of additional read operations
+over the existing deduplication technique.
+
+\subsection{Memory Overhead Evaluation}
+
+As explained in Section 4.3,
+chunk level mapping table requires large memory space to handle partially duplicate pages.
+In FineDedup, we have proposed 
+the demand-based hybrid mapping table to reduce the required memory size for a mapping table without performance degradations.
+In Fig.~\ref{fig:mappingoverhead}, the effectiveness of the proposed mapping table is evaluated in terms of the hit ratio and 
+the amount of additional written data with various memory sizes for the cache.
+Since the PMT of the hybrid mapping table in FineDeup is the same approach as the DFTL~\cite{dftl}, which is a well-known 
+demand-based scheme to exploit the page-level mapping,
+the overhead of PMT can be estimated from the overhead of DFTL.
+Thus, in order to focus on the overhead of the SMT, we assume that DFTL is employed as the baseline mapping scheme in our evaluation.
+
+Fig.~\ref{fig:mappingoverhead}(a) shows the hit ratio of the cached SMT. 
+With a 120 KB cache, more than 95\% of the mapping table accesses are absorbed.
+In addition, Fig.~\ref{fig:mappingoverhead}(b) shows extra written data caused by the evicted page entries 
+from the SMT cache.
+Since mapping table accesses occur in the middle of read/write operations, it is important to reduce the 
+amount of written data from evicted page entries in terms of read/write performance.
+Similar to the hit ratio, the overhead by the eviction becomes almost negligible 
+when the cache size is set to 120 KB under most workloads.
+
+Note that the memory overhead in the \texttt{M-media} trace is not as significant as the other
+traces when the cache size is very small as shown in Fig.~\ref{fig:mappingoverhead},
+although all of them have a similar number of read requests.
+%It is mainly because the former traces do not benefit from the subpage chunking.
+It is mainly because the former traces do not benefit from the fine-grained chunking scheme.
+Since most of data in the \texttt{M-media} trace contains unique data,
+chunk-level mapping table is used only for small amount of data.
+%As a result, FineDedup does not incur significant memory overhead when the subpage chunking method is not effective.
+As a result, FineDedup does not incur a significant memory overhead 
+even when the fine-grained chunking method is not effective.
+
+\begin{figure}[t]
+	\center
+	\subfigure[Hit ratio of SMT cache]{\label{fig:mappingcachehit}\includegraphics[scale=0.9]{figure/finededup/mappingcachehit}}
+	\subfigure[Extra data written due to SMT cache evictions]{\label{fig:mappingeviction}\includegraphics[scale=0.9]{figure/finededup/mappingeviction}}
+	\caption{The effectiveness of the demand-based hybrid mapping table in FineDedup with various cache sizes.}
+	\label{fig:mappingoverhead}
+\end{figure}
+
+%\subsection{Implementation Complexity Study}
+
+\section{Conclusions}
+
+In this paper, we propose a fine-grained deduplication technique for flash-based SSDs, called FineDedup.
+By using a fine-grained deduplication unit,
+the proposed FineDedup technique increases the amount of data eliminated 
+by data deduplication by up to 37\% over the existing page-based deduplication technique,
+extending the SSD lifetime by the same amount.
+FineDedup inevitably increases the overall read response time because of data fragmentation.
+By employing a chunk read buffer and a chunk packing scheme,
+however, the read performance overhead is limited to less than 5\% 
+in comparison with the existing deduplication technique.
+To reduce the memory space required for a chunk-level mapping table,
+FineDedup adopts a hybrid mapping scheme.
+Our evaluation results show that 
+FineDedup is effective in improving the SSD lifetime,
+requiring only about 10 MBs of more memory space in total.
+%This improvement comes with less than 5\% read response time overhead over the existing techniques, requir-
+%ing a negligible memory space increase.
+
