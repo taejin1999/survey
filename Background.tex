@@ -3,6 +3,125 @@
 \label{chap:Background}
 
 
-In order to improve NAND endurance, reliability and performance parameters are dynamically changed during run time in this dissertation.
-In this chapter, we review the basics of key \textit{Vth} design parameters and the principals of a NAND program operation.
+\subsection{Related Work}
+
+\subsubsection{Write Traffic Reduction Techniques}
+In order to extend the lifetime of flash-based SSDs,
+data deduplication techniques have been used in recent SSDs
+because they are effective in reducing the amount of data written to flash memory by preventing duplicate data from being written again~\cite{caftl,value-locality}.
+As a result, only non-duplicate data, i.e., unique data, are stored in SSDs effectively decreasing the total amount of data written to
+SSDs.
+In most deduplication schemes proposed for SSDs,
+the unit of data deduplication is same as the flash page size which is usually 4 KB or 8 KB.
+Using a page as a deduplication unit seems to be reasonable 
+because the unit of a read or write operation of flash memory is also a page. 
+However, this page-based deduplication technique misses many chances of eliminating duplicate data, especially
+when two pages are \textit{almost} identical.
+For example, in our experimental analysis of an existing 4 KB page-based deduplication technique, we observed that
+up to 34\% mostly identical data.
+If the unit of deduplication were smaller than 4 KB, about 23\% more data could be identified as duplicate data.
+%We observed that up to 48\% of unique pages actually contain mostly identical data.
+%The existing techniques, however, can not completely eliminate the duplicate segment in those pages 
+%since they are considered as unique pages.
+Furthermore, it is expected that the effectiveness of the page-based deduplication technique would 
+get even worse in future NAND flash memory as the page size of 
+flash memory is expected to increase
+to a bigger size such as 16 KB~\cite{16kpage}.
+
+%In our observation, many pages are rewritten to flash memory after being modified slightly.
+%Thus, the contents of the previous page and the new one are nearly identical.
+%{\color{red}In our observation, however,
+%this page-based deduplication loses many chances of eliminating duplicate data because of following two reasons.
+%( ).}
+
+%In order to extend the limited lifespan, data deduplication technique, which removes redundant data from the workload,
+%has been widely adopted in SSDs. 
+%In the existing scheme, the size of a chunk, which is used as a unit of redundancy checking and writing, is commonly 
+%fixed to the page size of the flash memory to minimize the additional management overhead.
+%Using page-sized chunking method, however, slightly modified data chunk can not be determined as duplicated data although
+%most of data in the chunk are the same, i.e. \textit{partially matched data}.
+%Furthermore, the portion of \textit{partially matched data} is expected to be even significantly larger when the flash page size 
+%becomes bigger as the semiconductor technology scales down.
+%For example, the page size of initial SLC flash memory was 2KB.%~\cite{2kpage}. 
+%The 4KB-sized page has become more common in both industry and research in the late 2000s.%~\cite{4kpage1,4kpage2,4kpage3}. 
+%In the early 2010s, the scaling trend has been accelerated so 
+%that the flash page size has become 8KB%~\cite{8kpage1,8kpage2} 
+%and even 16KB. %~\cite{16kpage}. 
+%Under the \textit{large-page} flash memory, the existing deduplication techniques
+%for SSDs have unavoidable limitations since the probability of finding pages with an exact match will be significantly low.
+%---------------------------------------------
+
+%The most well-known approach that improves the storage lifetime is to optimize flash firmware algorithms. 
+%As mentioned previously, 
+Because of the ``erase-before-write'' nature of NAND flash memory, 
+flash storage devices employ a flash translation layer (FTL) 
+that supports address mapping, garbage collection, and wear-leveling algorithms~\cite{FAST}. %~\cite{BAST,FAST,LAST}.
+These firmware algorithms incur a lot of extra write/erase operations,
+seriously shortening the overall lifetime of a storage device.
+For this reason, a large number of studies have been focused on reducing such extra operations to improve the storage 
+lifetime.
+%The firmware-level optimization has been effective in improving the lifetime of flash-based SSDs. 
+However, considering the decreasing lifetime of recent high-density NAND flash memory such as TLC NAND flash memory~\cite{tlc}, %~\cite{mlc1,mlc2}, 
+more aggressive lifetime management solutions are required. 
+
+Data deduplication techniques, which are originally developed for backup systems,
+are regarded as one of the promising approaches for extending the storage lifetime
+because of their ability that reduces the amount of write traffic sent to a storage device.
+In deduplication techniques, a chunk is used as an unit of identification and elimination of duplicate data.
+%An unit of verification of duplicate and elimination is called chunk in deduplication techniques.
+Depending on their chunking strategies, deduplication techniques can be categorized into two types,
+fixed-size deduplication and variable-size deduplication.
+Fixed-size deduplication divides an input data stream into fixed-size chunks (e.g., pages)~\cite{caftl,value-locality}. %~\cite{caftl,value-locality,idedup}.
+Then, it decides if each chunk data is duplicate and prevents duplicate chunks %whose data are already stored in flash memory 
+from being rewritten to flash memory.
+Unlike fixed-size deduplication, 
+the chunk size of variable-size deduplication is not fixed.
+Instead, it decides a cut point between chunks using 
+a content-defined chunking (CDC) algorithm
+which divides the data stream according to the contents~\cite{dedupv1, dong}.
+
+% SSD의 경우 fixed-size dedup을 할 수 밖에 없음을 강조
+In general, variable-size deduplication techniques can identify more data as duplicate data than the fixed-size deduplication technique.
+Since variable-size deduplication adaptively changes the size of chunks by analyzing the contents of input stream,
+duplicate data are more effectively found regardless of their locations.
+In spite of its advantages, variable-size deduplication is not commonly used in SSDs because of the following practical limitations.
+First, variable-size deduplication often requires
+the entire data contents to be available.
+Therefore, it is commonly adopted at the level of operating systems or file systems.
+Second, the CDC algorithm often requires relatively high computational power and a large amount of memory space.
+Thus, variable-size deduplication is not appropriate to be employed at the level of storage devices
+where computing and memory resources are constrained.
+Lastly, the size of remaining unique data after deduplication may vary in variable-size deduplication.
+When writing those data, a complicated scheme for data size management is required to form sub-page
+data chunks to fit in a flash page size, preventing an internal fragmentation.
+For those reasons, most existing deduplication techniques for SSDs employ fixed-size deduplication, 
+which is relatively simple and does not require a significant amount of hardware resources.
+
+Similar to the existing deduplication techniques,
+the proposed FineDedup technique is also based on fixed-size deduplication.
+Using a smaller deduplication unit,
+however, FineDedup improves the likelihood of eliminating duplicate data.
+This approach can complement the limitation of existing fixed-size deduplication techniques,
+which exhibit a relatively low amount of removed writes 
+in comparison with variable-size deduplication.
+
+
+\subsubsection{Data Separation Techniques}
+
+To the best of our knowledge, \textsf{\small AutoStream}~\cite{AutoStream} is the only automatic 
+stream management technique
+without additional manual work.  
+However, since \textsf{\small AutoStream} predicts data lifetimes using the update frequency 
+of the logical block address (LBA), it does not work well with modern append-only workloads 
+such as RocksDB~\cite{RocksDB} or Cassandra~\cite{Cassandra}.  
+Unlike conventional update workloads where data written to the same LBAs 
+often show strong update locality, 
+append-only workloads make it impossible to predict data lifetimes 
+from LBA characteristics (such as access frequency or access patterns).  
+For example, as shown in Fig.~\ref{fig:lba_lifetime}(b), 
+data written to a fixed LBA range over time in RocksDB 
+show widely varying data lifetimes, 
+thus making it difficult to allocate streams based on LBA characteristics.
+
+
 

@@ -4,5 +4,125 @@
 
 \section{Motivation}
 \label{sec:Intro_Motivation}
+NAND flash-based solid-state drives (SSDs) are widely used in personal computing
+systems as well as mobile embedded systems. However, in enterprise environments,
+SSDs are employed in only limited applications because SSDs are not yet cost 
+competitive with HDDs. Fortunately, the prices for SSDs have fallen to the 
+comparable level of HDDs by continuous semiconductor process scaling 
+(e.g., 10 nm-node process) combined with multi-leveling technologies (e.g., 
+MLC and TLC). However, the limited endurance of NAND flash memory, which have
+declined further as a side effect of the recent advanced device technologies,
+is emerging as another major barrier to the wide adoption of SSDs. (NAND endurance
+is the ability of a memory cell to endure program/erase (P/E) cycling, and is
+quantified as the maximum number $MAX_{P/E}$ of P/E cycles that the cell can tolerate
+while maintaining its reliability requirements.) 
+For example, although the NAND capacity per die doubles every two years, the 
+actual lifetime of SSDs does not increase as much as projected in the past seven
+years because the $MAX_{P/E}$ has declined by 70\% during that period~\cite{MooresLaw}.
+Since the reduction in the $MAX_{P/E}$ seriously limits the overall lifetime of flash-based SSDs,
+the issues concerning the lifetime of SSDs should be properly resolved for SSDs to be commonly 
+used in enterprise environments.
 
-TBD
+Since the Lifetime $L_C$ of an SSD with the total capacity $C$ is proportional to 
+the maximum number $MAX_{P/E}$ of P/E cycles, and is inversely proportional to the
+total written data $W_{day}$ per day, $L_C$ (in days) can be expressed as follows
+~\cite{DPES}(assuming a perfect wear leveling):
+\[L_C = \frac{MAX_{P/E} \times C}{W_{day} \times WAF}\],
+where $WAF$ is a write amplification factor which represents the efficiency of an FTL
+algorithm. Since $MAX_{P/E}$ and $C$ is determined when the device is manufactured,
+we should reduce the $W_{day}$ and $WAF$ to improve the lifetime of SSDs.
+Many existing lifetime-enhancing techniques have been focused on reducing $WAF$
+by increasing the efficiency of an FTL algorithm. For example, by avoiding
+unnecessary data copies during garbage collection, $WAF$ can be reduced.
+In order to reduce $W_{day}$, various system-level techniques were proposed.
+For example, data deduplication, data compression, and write traffic 
+throttling are such techniques.
+
+
+
+기존 기법들의 문제점 간단히 지적,  -> 
+cross layer 최적화가 필요하다. 
+In order for NAND flash-based storage devices to be broadly adopted in
+various computing environments, therefore,
+new approaches that properly address the lifetime problem of recent
+high-density NAND flash memory are highly required.
+
+\begin{comment}
+%----------------------------------------------------
+As the price-per-byte of NAND flash memory is rapidly decreasing,
+NAND flash-based solid-state drives (SSDs) are emerging as a viable high-performance storage solution
+for laptops, desktop PCs and high-performance enterprise systems.
+%The poor write endurance of NAND flash memory, however, is emerging as one of the main obstacles 
+%for wider adoption of SSDs in various computing environments.
+%In NAND flash memory, reads and writes are performed in a unit of a page.
+%Because of its `erase-before-write' nature,
+%a block consisting of multiple pages must be erased before programming (or writing) new data to it.
+%Unfortunately, as the semiconductor process is scaled down and the multi-level cell (MLC) technology is introduced,
+However, as NAND flash memory technology scales down to 20-nm and below, storing data reliably in NAND flash memory
+gets a key design challenge of NAND-based storage systems. 
+For example, the number of program/erase (P/E) cycles allowed for each block is significantly reduced in recent triple-level cell (TLC)
+NAND technology.
+While older 5x-nm single-level cell (SLC) NAND flash memory can support about 10 K P/E cycles, recent 2x-nm TLC NAND flash memory
+can barely support about 1 K P/E cycles~\cite{tlc}.
+%the number of P/E cycles is reduced to 3K~\cite{mlc1}. %~\cite{mlc1,mlc2}.
+%As a result, the reduction in the number of P/E cycles seriously limits the overall lifetime of flash-based SSDs.
+%----------------------------------------------------
+\end{comment}
+
+\section{Dissertation Goals}
+In this dissertation, we propose system-level approaches that improve 
+the lifetime of NAND flash-based storage devices, which overcomes the limitations
+of the existing techniques. More specifically, our primary goal is to understand 
+high-level information of applications or file systems, such as the 
+I/O context of dominant I/O activities and data contents of the file system,
+and then develop the lifetime improvement approaches that efficiently exploit such
+high-level information at various system levels ranging from a system call layer 
+to a flash controller.
+
+First, 
+\section{Contributions}
+In this dissertation, we present two system-level techniques to improve the 
+lifetime of NAND flash-based storage devices. 
+The contributions of this dissertation can be summarized as follows:
+
+\begin{itemize}
+\item 
+We propose a fully automatic stream management technique, called \textsf{\small PCStream}, 
+for multi-streamed SSDs based on program contexts (PCs).
+Since the key motivation behind \textsf{\small PCStream} was 
+that data lifetimes should be estimated at a higher abstraction level than LBAs, 
+\textsf{\small PCStream} employed a write program context\footnote{Since we are interested in write-related 
+system call such as write() in the Linux kernel, 
+we call the related program context as 
+{\it write program contexts} or simply {\it program contexts} in this paper.}  
+as a stream management unit.
+A program context~\cite{PC, PC2}, which represents a particular execution phase of a program, 
+is known to be an effective hint in separating data with different lifetimes~\cite{PCHa}.  
+\textsf{\small PCStream} automatically maps an identified program context to a stream.  
+Since program contexts can be computed during runtime, 
+\textsf{\small PCStream} does not need any manual work.   
+
+
+\item
+We propose a fine-grained deduplication technique for flash-based SSDs, called \textit{FineDedup}.
+The proposed FineDedup technique is different from other existing deduplication techniques
+in that it increases the likelihood of finding duplicates
+by using a finer deduplication unit
+which is smaller than a single page (e.g., one fourth of a single page).
+With a smaller deduplication unit,
+many data segments within a page can be detected as a duplicate one, 
+so the amount of data written to flash memory can be reduced regardless of a physical page size.
+
+
+Although most program contexts show that their data lifetimes are 
+distributed with small variances, we observed a few outliers 
+whose data lifetimes have rather large variances.
+In \textsf{\small PCStream}, 
+when such a PC {\it pID} is observed (which was mapped to a stream {\it sID}), 
+the long-lived data of {\it pID} are moved to the substream of {\it sID}
+during GC.  
+The substream prevents the long-lived data of the stream {\it sID} 
+from being mixed with future short-lived data of the stream {\it sID}.
+
+\end{itemize}
+

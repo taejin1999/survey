@@ -29,68 +29,6 @@ In this paper, our goal is to develop
 %a {\it fully automatic} technique for managing streams which is applicable for {\it any} multi-streamed SSD.
 a {\it fully automatic} stream management technique. %which is applicable for multi-streamed SSD. %shane part
 
-To the best of our knowledge, \textsf{\small AutoStream}~\cite{AutoStream} is the only automatic 
-stream management technique
-without additional manual work.  
-However, since \textsf{\small AutoStream} predicts data lifetimes using the update frequency 
-of the logical block address (LBA), it does not work well with modern append-only workloads 
-such as RocksDB~\cite{RocksDB} or Cassandra~\cite{Cassandra}.  
-Unlike conventional update workloads where data written to the same LBAs 
-often show strong update locality, 
-append-only workloads make it impossible to predict data lifetimes 
-from LBA characteristics (such as access frequency or access patterns).  
-For example, as shown in Fig.~\ref{fig:lba_lifetime}(b), 
-data written to a fixed LBA range over time in RocksDB 
-show widely varying data lifetimes, 
-thus making it difficult to allocate streams based on LBA characteristics.
-
-In this paper, we propose a fully automatic stream management technique, called \textsf{\small PCStream}, 
-for multi-streamed SSDs based on program contexts (PCs).
-Since the key motivation behind \textsf{\small PCStream} was 
-that data lifetimes should be estimated at a higher abstraction level than LBAs, 
-\textsf{\small PCStream} employed a write program context\footnote{Since we are interested in write-related 
-system call such as write() in the Linux kernel, 
-we call the related program context as 
-{\it write program contexts} or simply {\it program contexts} in this paper.}  
-as a stream management unit.
-A program context~\cite{PC, PC2}, which represents a particular execution phase of a program, 
-is known to be an effective hint in separating data with different lifetimes~\cite{PCHa}.  
-\textsf{\small PCStream} automatically maps an identified program context to a stream.  
-Since program contexts can be computed during runtime, 
-\textsf{\small PCStream} does not need any manual work.   
-%In order to handle append-only workloads, 
-%\textsf{\small PCStream} extended the definition of the data lifetime 
-%so that the effect of the TRIM command~\cite{TRIM} can be accounted for. 
-
-Although most program contexts show that their data lifetimes are 
-distributed with small variances, we observed a few outliers 
-whose data lifetimes have rather large variances.
-In \textsf{\small PCStream}, 
-when such a PC {\it pID} is observed (which was mapped to a stream {\it sID}), 
-the long-lived data of {\it pID} are moved to the substream of {\it sID}
-during GC.  
-The substream prevents the long-lived data of the stream {\it sID} 
-from being mixed with future short-lived data of the stream {\it sID}.
-
-In order to evaluate the effectiveness of \textsf{\small PCStream}, 
-we have implemented \textsf{\small PCStream}
-in the Linux kernel (ver. 4.5) and measured write amplification factor (WAF) values 
-using RocksDB on a Samsung PM963 SSD 
-and an SSD emulator.
-Our experimental results show that \textsf{\small PCStream}
-can reduce the GC overhead as much as a %highly-optimized 
-manual stream management technique while requiring no code modification.  
-Furthermore, \textsf{\small PCStream} outperformed \textsf{\small AutoStream} by reducing the average WAF by 35\%.
-
-The rest of this paper is organized as follows. 
-We explain the key motivations behind \textsf{\small PCStream} in Section 2. 
-Section 3 describes 
-the design of \textsf{\small PCStream}.
-The experimental results are shown in Section 4. 
-Finally, we conclude in Section 5 with a summary and future work. 
-
-
-\section{Basic Idea}
 \subsection{Fallacy: LBA-based lifetime prediction}
 Many existing data separation techniques such as~\cite{AutoStream, HotCold} 
 estimate the data lifetime based on the update frequency of LBAs.  
