@@ -151,21 +151,21 @@
 		{\fontsize{15}{15}\selectfont {\bfseries {\@engtitle}} \par}
 		\vspace*{10pt}
 		{\fontsize{13}{13}\selectfont {{\@advisor} \par}}
-		\null\vfill\vspace{-15pt}
+		\null\vfill\vspace{-35pt}
 		{\fontsize{13}{13}\selectfont {이 논문을 {\@degreetitle} 학위논문으로 제출함 \par}}
 		{\fontsize{12}{12}\selectfont {{\@submitdate} \par}}
 		\vspace*{9pt}
 		{\fontsize{13}{13}\selectfont {{\@university} \par}}
 		{\fontsize{12}{12}\selectfont {{\@collegeordept} \par}}
 		{\fontsize{14}{14}\selectfont {{\@author} \par}}
-		\null\vfill\vspace{-16pt}
+		\null\vfill\vspace{-26pt}
 		{\fontsize{13}{13}\selectfont {{\@author}의 {\@msorphd} 학위논문을 인준함 \par}}
 		{\fontsize{12}{12}\selectfont {{\@acceptdate} \par}}
 		\vspace*{23pt}
 		$\vbox{
 			\fontsize{12}{12}\selectfont 
           	\halign{
-				##&\underline{\hspace{1cm}##\hspace{1cm}\small(인)}\vspace{17pt}\cr
+				##&\underline{\hspace{1cm}##\hspace{1cm}\small(인)}\vspace{10pt}\cr
           		위\hfill 원\hfill 장				& {\@chief}\cr
           		부\hfill 위\hfill 원\hfill 장		& {\@vicechief}\cr
           		위\hfill 원						& {\@commiteea}\cr

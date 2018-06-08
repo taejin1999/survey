@@ -1,33 +1,36 @@
-\chapter{FineDedup} 
+\chapter{Fine-grained Deduplication Technique} 
 \label{chap:FineDedup}
 
 \section{Motivations}
+\label{sec:finededup_motivation}
 
-\begin{figure}[t]
-	\center
-	\includegraphics[scale=0.6]{figure/finededup/dupChunkperReq}
-	\caption{The percentage of pages according to their partial duplicate patterns.} % ok
-	\label{fig:percentage}
-\end{figure}
-
-Existing deduplication techniques for SSDs use a single page as a chunk for data deduplication~\cite{caftl,value-locality}.
+The write-requested page is identified whether the contents of the page have already been written and 
+is written to flash memory only if there is no existing duplicate page. 
 When a write-requested page is the exact duplicate of a previously written page, 
-the requested page is not written to flash memory; only the corresponding entry for a mapping table (between the
-logical address and physical address) is updated.
-On the other hand, if there is no existing page duplicate in flash memory whose contents are the same as those of requested one,
-the requested page has to be written to flash memory.
-However, even for these unique pages, if we check their redundancy at a sub-page level, say at a quarter of the page size,
-many sub-pages of these unique pages can be identified as redundant data.
-In existing techniques based on page-level deduplication, therefore, many duplicate data are written to flash memory even though 
-the same data chunks have already been written.
+the requested page is not written to flash memory; 
+only the corresponding entry for a mapping table (between the logical address and physical address) is updated. 
+On the other hand, if there is no existing page duplicate in flash memory whose contents are the 
+same as those of requested one, the requested page has to be written to flash memory. 
+However, even for these unique pages, if their redundancy is checked at a sub-page level, 
+say at a quarter of the page size, many sub-pages of these unique pages can be identified as redundant data. 
+In existing techniques based on page-level deduplication, therefore, 
+many duplicate data are written to flash memory even though the same data chunks have already been written.
 
 In order to better understand the effect of fine-grained deduplication on the amount of identified duplicate data,
 we analyzed how many more chunks can be identified as redundant 
 when the chunk size gets smaller than a single page.
 For our evaluation, we used five I/O traces, \texttt{PC}, \texttt{Sensor}, \texttt{Synth}, \texttt{Install}, and \texttt{Update} which are 
-explained in Section 5.
+explained in Section~\ref{sec:finededup_experimentalresult}.
 %collected from a desktop PC and a number of server systems used for a hardware synthesis, and a sensor data analysis.
 In our evaluation, the page size was 4 KB and the chunk size was set to 1 KB.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.5]{figure/finededup/dupChunkperReq}
+	\caption{The percentage of pages according to their partial duplicate patterns.} % ok
+	\label{fig:percentage}
+\end{figure}
+
 Fig.~\ref{fig:percentage} shows the percentage of the page writes from host, classified by their partial duplicate patterns.
 We denote that a page is a n/4-duplicate page when n chunks of the page are duplicate chunks.
 A 4/4-duplicate page is a duplicate page at the page level.
@@ -63,18 +66,10 @@ decreased in near future.
 In order to resolve this problem, the deduplication chunk size of deduplication techniques needs to be smaller than a page size.
 As depicted in Fig.~\ref{fig:chunksize}, 
 the deduplication ratio is saturated when the chunk size is 1 KB.
-Thus, we use it as a default chunk size in the rest of this paper.
+Thus, we use it as a default chunk size in the rest of this dissertation.
 
 \section{Fine-Grained Deduplication}
-
-In this section, we describe our proposed FineDedup technique in detail.
-We first explain the overall architecture of FineDedup and 
-describe how FineDedup handles read and write requests in Section 4.1.
-In Section 4.2 and 4.3,
-we introduce a read performance penalty and memory overheads caused by FineDedup, respectively,
-and explain how these problems can be resolved in FineDedup.
-
-
+\label{sec:finededup_finededup}
 In order to effectively incorporate fine-grained deduplication into flash-based SSDs,
 two key technical issues must be addressed properly.
 First, fine-grained deduplication requires a larger memory space than a coarse-grained one 
@@ -84,12 +79,16 @@ unique data segments from partially duplicated pages can be scattered across sev
 which may seriously degrade the overall read performance.
 The proposed FineDedup technique is designed to take full advantage of fine-grained deduplication
 with small memory overhead as well as a low read performance penalty.
-Our evaluation results show that 
-FineDedup prolongs the lifetime of SSDs by up to 37\% over page-based deduplication
-while requiring a negligible memory space increase.
-This improvement comes with a less than 5\% read performance penalty over page-based deduplication.
+
+In this section, we describe our proposed FineDedup technique in detail.
+We first explain the overall architecture of FineDedup and 
+describe how FineDedup handles read and write requests in Section~\ref{sec:finededup_architecture}.
+In Section~\ref{sec:finededup_readoverheadmanagement} and ~\ref{sec:finededup_memoryoverheadmanagement}
+we introduce a read performance penalty and memory overheads caused by FineDedup, respectively,
+and explain how these problems can be resolved in FineDedup.
 
 \subsection{Overall Architecture of FineDedup}
+\label{sec:finededup_architecture}
 
 Fig.~\ref{fig:overview} shows an overall architecture of FineDedup with its main components.
 Upon the arrival of a write request,
@@ -131,7 +130,7 @@ Because of its finer mapping granularity,
 the chunk-level mapping table is much larger than the existing page-level mapping table.
 To reduce the memory space for maintaining the chunk-level mapping table,
 FineDedup uses a hybrid mapping strategy,
-which is described in Section 4.3 in detail.
+which is described in Section~\ref{sec:finededup_memoryoverheadmanagement} in detail.
 
 \begin{figure}[t]
 	\center
@@ -160,6 +159,7 @@ which in turn significantly increases the overall read response time.
 We explain how FineDedup resolves this problem in the following subsection.
 
 \subsection{Read Overhead Management}
+\label{sec:finededup_readoverheadmanagement}
 
 FineDedup effectively reduces the number of pages written to flash memory
 by using a small-size chunk for deduplication,
@@ -213,6 +213,13 @@ top 10\% of the unique chunks serve more than 70\% of the total data read by a h
 By keeping frequently accessed chunks in a chunk read buffer,
 therefore, FineDedup can reduce a large number of page read operations sent to flash memory.
 
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.4]{figure/finededup/chunkbuffer}
+	\caption{A packing scheme in the \textit{chunk buffer}.} % ok
+	\label{fig:chunkbuffer}
+\end{figure}
+
 On the other hands, we have observed that about 39\% of read requests to unique pages actually requires two page read operations.
 In order to further reduce this read performance penalty,
 FineDedup uses a chunk packing scheme.
@@ -236,23 +243,17 @@ because every chunk of each request is not broken up into two pages.
 
 Note that the main objective of this scheme is to prevent chunks of a unique request to be scattered across multiple pages 
 avoiding unnecessary data fragmentation.
-%In order to directly insert a incoming unique request to chunk buffer,
-%page-sized free space is managed to be always available in the buffer.
+In order to directly insert a incoming unique request to chunk buffer,
+page-sized free space is managed to be always available in the buffer.
 When there is no free space for the next request and no suitable chunks of requests to form a single page,
 the chunks of a partially duplicate request is broken up into two pages.
 Most partially duplicated requests, however, are 3/4-Duplicate pages as shown in Fig.~\ref{fig:percentage}, which means 
 there are many requests of one unique chunk in the chunk buffer.
 Therefore, we can expect that most requests will be written to the same page even when the size of the chunk buffer is not large 
 since it is not quite difficult to find an appropriate chunk to fit a flash page.
-%In the above example, if we assume the chunk buffer can contain 8 chunks and \textit{Req 3} has three unique chunks,
-%only two chunks of \textit{Req 3} will be written along with existing chunks, `C' and `D', leaving the other chunk in chunk buffer.
-%A large chunk buffer provides more chance to avoid the request scattering.
-\begin{figure}[t]
-	\center
-	\includegraphics[scale=0.4]{figure/finededup/chunkbuffer}
-	\caption{A packing scheme in the \textit{chunk buffer}.} % ok
-	\label{fig:chunkbuffer}
-\end{figure}
+In the above example, if we assume the chunk buffer can contain 8 chunks and \textit{Req 3} has three unique chunks,
+only two chunks of \textit{Req 3} will be written along with existing chunks, `C' and `D', leaving the other chunk in chunk buffer.
+A large chunk buffer provides more chance to avoid the request scattering.
 
 
 %%%%% NEED TO BE EXPLAINED!!! POWER FAILURE 시 partial chunks 'C', 'D' 가 power-off recovery 될 수 있음. => reliability 관리  %%%
@@ -262,12 +263,14 @@ Moreover, they support internal cache power protection through the use of capaci
 at the event of power failure~\cite{sm825}.
 In order to keep the reliability in FineDedup, the remaining data in the chunk buffer can be stored to flash memory 
 during power protection procedure as well as the mapping information of the written page.
-%In conclusion for chunk buffer design, there is a trade-off between potential read performance and reliability depending on the chunk buffer size.
-%#The size of the chunk buffer, hence, should be determined according to the characteristics of workloads.
+In conclusion for chunk buffer design, there is a trade-off between potential read performance 
+and reliability depending on the chunk buffer size.
+The size of the chunk buffer, hence, should be determined according to the characteristics of workloads.
 
 \subsection{Memory Overhead Management}
+\label{sec:finededup_memoryoverheadmanagement}
 
-As mentioned in Section 4.1,
+As mentioned in Section~\ref{sec:finededup_architecture},
 FineDedup handles requested data in the unit of a chunk.
 Therefore, FineDedup must maintain a chunk-level mapping table
 that maps a logical chunk address to a physical chunk address in flash memory.
@@ -275,13 +278,6 @@ Since the size of a chunk is smaller than that of a page,
 a chunk-level mapping table is much larger than the page-level mapping table.
 For example, suppose that the page size is 4 KB and the chunk size is 1 KB.
 In that case, the size of a chunk-level mapping table is four times larger than that of a page-level mapping table.
-
-\begin{figure}[t]
-	\center
-	\includegraphics[scale=0.5]{figure/finededup/hybridmapping_1}
-	\caption{An overview of the demand-based hybrid mapping table.} % ok
-	\label{fig:hybridmapping}
-\end{figure}
 
 In order to reduce the amount of memory space required for a mapping table,
 FineDedup employs a hybrid mapping table
@@ -293,6 +289,14 @@ duplicate pages and unique pages still account for a considerable proportion of 
 For these pages, the page-level mapping table is more appropriate 
 because they can be directly mapped to corresponding pages in flash memory.
 The chunk-level mapping table is required only for partially duplicate pages.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.5]{figure/finededup/hybridmapping_1}
+	\caption{An overview of the demand-based hybrid mapping table.} % ok
+	\label{fig:hybridmapping}
+\end{figure}
+
 
 Fig.~\ref{fig:hybridmapping} shows the overall architecture of the hybrid mapping table used in FineDedup.
 The primary mapping table (PMT) is maintained in the page level 
@@ -346,6 +350,32 @@ Once a mapping page is loaded in memory, hence,
 most requests issued in similar times are serviced from the mappings in memory.
 
 \section{Experimental Results}
+\label{sec:finededup_experimentalresult}
+
+%In this section, 
+%we first describe our experimental settings and explain the benchmarks used for our evaluation in detail.
+%We then assess the effect of the proposed FineDedup technique on the SSD lifetime.
+%Finally, we analyze the read performance penalty and the memory overhead caused by FineDedup.
+%{\color{blue}We then analyze the benefit of the proposed FineDedup technique over the existing deduplication technique 
+%in terms of the SSD lifetime and overheads such as the additional read operation and the required memory size.}
+
+\subsection{Experimental Settings}
+
+In order to evaluate the effectiveness of FineDedup, 
+we performed our experiments using a trace-driven simulator with the I/O traces collected under various applications.
+The trace-driven simulator modeled the basic operations of NAND flash memory, 
+such as page read, page write and block erase operations,
+and included several flash firmware algorithms, 
+such as garbage collection and wear-leveling.
+The proposed FineDedup technique and the existing deduplication techniques were also implemented in our simulator.
+
+For trace collection, 
+we modified the Linux kernel 2.6.32 and collected I/O traces at the level of a block device driver.
+All the I/O traces include detailed information about the I/O commands sent to a storage device
+(e.g., the type of requests, logical block addresses (LBA), the size of requests, etc.) 
+as well as the contents of the data sent to or read from a storage device.
+We recorded I/O traces while running various real-world applications.
+The detailed descriptions of these I/O traces are summarized in Table~\ref{tab:traces}.
 
 \begin{table}[t]
 	\renewcommand{\tabcolsep}{1.4mm} 
@@ -384,39 +414,15 @@ most requests issued in similar times are serviced from the mappings in memory.
 \end{table}
 
 
-In this section, 
-we first describe our experimental settings and explain the benchmarks used for our evaluation in detail.
-We then assess the effect of the proposed FineDedup technique on the SSD lifetime.
-Finally, we analyze the read performance penalty and the memory overhead caused by FineDedup.
-%{\color{blue}We then analyze the benefit of the proposed FineDedup technique over the existing deduplication technique 
-%in terms of the SSD lifetime and overheads such as the additional read operation and the required memory size.}
-
-\subsection{Experimental Settings}
-
-In order to evaluate the effectiveness of FineDedup, 
-we performed our experiments using a trace-driven simulator with the I/O traces collected under various applications.
-The trace-driven simulator modeled the basic operations of NAND flash memory, 
-such as page read, page write and block erase operations,
-and included several flash firmware algorithms, 
-such as garbage collection and wear-leveling.
-The proposed FineDedup technique and the existing deduplication techniques were also implemented in our simulator.
-
-For trace collection, 
-we modified the Linux kernel 2.6.32 and collected I/O traces at the level of a block device driver.
-All the I/O traces include detailed information about the I/O commands sent to a storage device
-(e.g., the type of requests, logical block addresses (LBA), the size of requests, etc.) 
-as well as the contents of the data sent to or read from a storage device.
-We recorded I/O traces while running various real-world applications.
-The detailed descriptions of these I/O traces are summarized in Table~\ref{tab:traces}.
+\subsection{Effectiveness of FineDedup}
 
 \begin{figure}[t]
 	\center
-	\includegraphics[scale=0.75]{figure/finededup/dataReduction_Chunksize_less}
+	\includegraphics[scale=0.6]{figure/finededup/dataReduction_Chunksize_less}
 	\caption{The amount of written data under various schemes.} % ok
 	\label{fig:reducedData}
 \end{figure}
 
-\subsection{Effectiveness of FineDedup}
 
 Fig.~\ref{fig:reducedData} shows the amount of data written to flash memory by FineDedup over the existing scheme.
 The results shown in Fig.~\ref{fig:reducedData} are normalized to \textit{RAW\_req},
@@ -448,15 +454,16 @@ Thus, both the existing deduplication techniques and FineDedup are not effective
 amount of data written to flash memory.
 
 \subsection{Read Overhead Evaluation}
+\label{sec:finededup_readoverheadevaluation}
 
 \begin{figure}[t]
 	\center
-	\includegraphics[scale=0.75]{figure/finededup/increasedPageRead}
+	\includegraphics[scale=0.6]{figure/finededup/increasedPageRead}
 	\caption{The number of page read operations.} % ok
 	\label{fig:pageread}
 \end{figure}
 
-As explained in Section 4.2, 
+As explained in Section~\ref{sec:finededup_readoverheadmanagement}, 
 %subpage chunking in FineDedup increases the number of page read operations. 
 fine-grained chunking in FineDedup increases the number of page read operations. 
 %In FineDedup, we have have proposed the optimization techniques, such as the packing scheme and the chunk read buffer,
@@ -477,8 +484,9 @@ FineDedup with both the packing scheme and chunk read buffer incurs on average l
 over the existing deduplication technique.
 
 \subsection{Memory Overhead Evaluation}
+\label{sec:finededup_memoryoverheadevaluation}
 
-As explained in Section 4.3,
+As explained in Section~\ref{sec:finededup_memoryoverheadmanagement},
 chunk level mapping table requires large memory space to handle partially duplicate pages.
 In FineDedup, we have proposed 
 the demand-based hybrid mapping table to reduce the required memory size for a mapping table without performance degradations.
@@ -488,6 +496,14 @@ Since the PMT of the hybrid mapping table in FineDeup is the same approach as th
 demand-based scheme to exploit the page-level mapping,
 the overhead of PMT can be estimated from the overhead of DFTL.
 Thus, in order to focus on the overhead of the SMT, we assume that DFTL is employed as the baseline mapping scheme in our evaluation.
+
+\begin{figure}[t]
+	\center
+	\subfigure[Hit ratio of SMT cache]{\label{fig:mappingcachehit}\includegraphics[scale=0.8]{figure/finededup/mappingcachehit}}
+	\subfigure[Extra data written due to SMT cache evictions]{\label{fig:mappingeviction}\includegraphics[scale=0.8]{figure/finededup/mappingeviction}}
+	\caption{The effectiveness of the demand-based hybrid mapping table in FineDedup with various cache sizes.}
+	\label{fig:mappingoverhead}
+\end{figure}
 
 Fig.~\ref{fig:mappingoverhead}(a) shows the hit ratio of the cached SMT. 
 With a 120 KB cache, more than 95\% of the mapping table accesses are absorbed.
@@ -509,32 +525,102 @@ chunk-level mapping table is used only for small amount of data.
 As a result, FineDedup does not incur a significant memory overhead 
 even when the fine-grained chunking method is not effective.
 
+
+
+\subsection{Evaluation of the Effectiveness of Cached Mapping Table for Mixed Workloads}
+
 \begin{figure}[t]
 	\center
-	\subfigure[Hit ratio of SMT cache]{\label{fig:mappingcachehit}\includegraphics[scale=0.9]{figure/finededup/mappingcachehit}}
-	\subfigure[Extra data written due to SMT cache evictions]{\label{fig:mappingeviction}\includegraphics[scale=0.9]{figure/finededup/mappingeviction}}
-	\caption{The effectiveness of the demand-based hybrid mapping table in FineDedup with various cache sizes.}
-	\label{fig:mappingoverhead}
+	\includegraphics[scale=0.45]{figure/finededup/evicteddata_result.png}
+	\caption{The amount of extra written data due to mapping table eviction for the mixed workload.} % ok
+	\label{fig:eviction_mixed}
 \end{figure}
 
-%\subsection{Implementation Complexity Study}
+The effectiveness of the cached mapping table is evaluated for mixed workloads. 
+Fig.~\ref{fig:eviction_mixed} shows the normalized amount of additionally written data due to the 
+mapping table eviction. 
+The mixed traces are composed by accumulating individual traces in the order of 
+\texttt{PC}, \texttt{Synth}, \texttt{Sensor}, \texttt{Install}, and \texttt{Update}. 
+For example, mixed workload 4 is composed with \texttt{PC}, \texttt{Synth}, \texttt{Sensor}, and \texttt{Install}.
+Although, the cached mapping table is not effective as the number of traces is increased, 
+the performance degradation rate is smaller than the number of workload increasing rate. 
+Moreover, mapping table caching will be effective when the caching memory is big enough to contain 
+the working set of each trace. 
+In the evaluation, the required memory space for the cached mapping table is about 1 MB for the mixed workload. 
+Considering that commercial SSDs have hundreds of GBs of DRAM, the memory overhead of a few MB is not large.
 
-\section{Conclusions}
 
-In this paper, we propose a fine-grained deduplication technique for flash-based SSDs, called FineDedup.
-By using a fine-grained deduplication unit,
-the proposed FineDedup technique increases the amount of data eliminated 
-by data deduplication by up to 37\% over the existing page-based deduplication technique,
-extending the SSD lifetime by the same amount.
-FineDedup inevitably increases the overall read response time because of data fragmentation.
-By employing a chunk read buffer and a chunk packing scheme,
-however, the read performance overhead is limited to less than 5\% 
-in comparison with the existing deduplication technique.
-To reduce the memory space required for a chunk-level mapping table,
-FineDedup adopts a hybrid mapping scheme.
-Our evaluation results show that 
-FineDedup is effective in improving the SSD lifetime,
-requiring only about 10 MBs of more memory space in total.
-%This improvement comes with less than 5\% read response time overhead over the existing techniques, requir-
-%ing a negligible memory space increase.
+\subsection{Evaluation of the Effectiveness of the Chunk Read Buffer}
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.65]{figure/finededup/readbuffer_result.png}
+	\caption{The number of page reads with and without read buffer.} % ok
+	\label{fig:readbuffer}
+\end{figure}
+
+The effectiveness of the chunk read buffer between the baseline policy and FineDedup is evaluated. 
+Fig.~\ref{fig:readbuffer} shows the amount of page reads for the baseline policy and FineDedup 
+with and without the read buffer. 
+The read buffer absorbs about 8\% read requests of \textit{RAW\_req}, whereas the read requests are 
+reduced by about 25\% with the read buffer for FineDedup on average. 
+Based on the analysis, the higher effectiveness of the read buffer in FineDedup is 
+because of the increased memory utilization by deduplication. 
+The read buffer in the baseline policy can absorb read requests for pages that have already been read. 
+Chunk read buffer in FineDedup, however, can also absorb the read requests for deduplicated pages pointed 
+by the hybrid mapping table. 
+Therefore, with the same read buffer size, more read requests can be absorbed in FineDedup.
+
+
+\subsection{Sensitivity Study on Chunk Read Buffer Size}
+In addition to the evaluation of read overhead management shown in Section~\ref{sec:finededup_readoverheadevaluation},
+we have evaluated that how the size of the chunk read buffer affects the number of read operations.
+Fig.~\ref{fig:buffersize} shows the normalized number of read operations compared with the number
+of read requests in the workloads while varying the buffer size from 8 KB to 32 MB.
+The LRU scheme is used to be a replacement scheme in the chunk read buffer.
+The chunk buffer is not used in this evaluation in order to focus only on the chunk read buffer.
+When the buffer size gets larger, the number of read operations decreases.
+
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.8]{figure/finededup/buffersize}
+	\caption{The number of page read operations under varying chunk read buffer sizes.} % ok
+	\label{fig:buffersize}
+\end{figure}
+
+As explained in Section~\ref{sec:finededup_readoverheadmanagement}, the access frequencies of unique chunks are greatly skewed.
+Thus, it is important for read performance to keep those hot chunks in the chunk read buffer.
+As shown in Fig.~\ref{fig:buffersize}, the chunk read buffer can absorb most read requests 
+except for \texttt{PC} and \texttt{Install} traces.
+In the \texttt{PC} and \texttt{Install} traces, 
+the skewness of unique read accesses to hot chunks was significantly lower than other traces, thus
+limiting the effectiveness of the chunk read buffer.
+Since the effectiveness of the chunk read buffer diminishes as its size increases more than 8 MB,
+in our experiments in Section~\ref{sec:finededup_readoverheadevaluation}, a 8 MB chunk read buffer was used.
+
+\subsection{Sensitivity Study on Chunk Buffer Size}
+\begin{figure}[t]
+	\center
+	\includegraphics[scale=0.8]{figure/finededup/chunkbuffersize}
+	\caption{The number of page read operations under varying chunk buffer sizes.} % ok
+	\label{fig:chunkbuffersize}
+\end{figure}
+
+
+We have also evaluated that how the size of chunk buffer affects the number of read operations.
+As explained in Section~\ref{sec:finededup_readoverheadmanagement},
+the chunk buffer separates chunks of unique requests and chunks of partially duplicate requests.
+Moreover, it also tries not to split chunks of partially duplicate requests into multiple pages.
+Thus, a larger chunk buffer can reduce more potential extra read operations by preventing chunk splits.
+Fig.~\ref{fig:chunkbuffersize} shows the normalized number of read operations compared with the number of read requests
+in the workloads while varying the chunk buffer size from 8 KB to 1 MB.
+For this evaluation, the chunk read buffer is not used to focus only on the chunk buffer.
+
+As shown in Fig.~\ref{fig:chunkbuffersize}, the number of read operations does not decrease much as the chunk buffer size increases.
+Since most partially duplicated requests in our traces is 3/4-Duplicate pages as explained
+in Section~\ref{sec:finededup_readoverheadmanagement}, 
+it is not difficult to find an appropriate chunk to fit a single flash page.
+As shown in Fig.~\ref{fig:chunkbuffersize}, however, the benefit of chunk buffer is rather limited.
+For example, there is no significant saving in the number of read pages for a chunk buffer larger than 200 KB. 
+(In our experiment in Section~\ref{sec:finededup_readoverheadevaluation}, we used a 200-KB chunk buffer.)
+
 

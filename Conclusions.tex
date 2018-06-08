@@ -3,9 +3,49 @@
 \label{chap:Conclusions}
 
 \section{Summary and Conclusions}
+The cost-per-bit of NAND flash-based solid-state drives (i.e., SSDs) has 
+steadily improved through uninterrupted semiconductor process scaling and 
+multi-leveling so that they are how widely employed in not only mobile embedded 
+systems but also personal computing systems.
+However, the limited lifetime of NAND flash memory, as a side effect of recent 
+advanced device technologies, is emerging as one of the major concerns for 
+recent high-performance SSDs, especially for datacenter applications.
 
+In this dissertation, we proposed several system-level techniques that improve
+the lifetime of NAND flash-based storage devices. We first presented
+data separation technique, called PCStream, for multi-streamed SSDs.
+Unlike existing stream management techniques, \textsf{\small PCStream} fully automates 
+the process of mapping data to a stream based on PCs, 
+which work well for append-only workloads as well as update workloads.  
+By exploiting an observation that most PCs are distinguishable from each other 
+in their lifetime characteristics, \textsf{\small PCStream} allocates each PC to a different stream.  
+When a PC has a large variance in their lifetimes, \textsf{\small PCStream} refines its stream allocation 
+during garbage collection and moves the long-lived data of the current stream to its substream.  
 
-The cost-per-bit of NAND flash-based solid-state drives (i.e., SSDs) has steadily improved through uninterrupted semiconductor process scaling and multi-leveling so that they are how widely employed in not only mobile embedded systems but also personal computing systems.
-However, the limited lifetime of NAND flash memory, as a side effect of recent advanced device technologies, is emerging as one of the major concerns for recent high-performance SSDs, especially for datacenter applications.
+Next, 
+we propose a fine-grained deduplication technique for flash-based SSDs, called FineDedup.
+By using a fine-grained deduplication unit,
+the proposed FineDedup technique increases the amount of data eliminated 
+by data deduplication by up to 37\% over the existing page-based deduplication technique,
+extending the SSD lifetime by the same amount.
+FineDedup inevitably increases the overall read response time because of data fragmentation.
+By employing a chunk read buffer and a chunk packing scheme,
+however, the read performance overhead is limited to less than 5\% 
+in comparison with the existing deduplication technique.
+To reduce the memory space required for a chunk-level mapping table,
+FineDedup adopts a hybrid mapping scheme.
+Our evaluation results show that 
+FineDedup is effective in improving the SSD lifetime,
+requiring only about 10 MBs of more memory space in total.
 
+\section{Future Work}
+\subsection{Improving stream mapping method of PCStream}
 
+The current version of \textsf{\small PCStream} can be extended in several directions.  
+For example, we plan to optimize the PC clustering method so that
+multiple PCs can be better clustered when the number of PCs significantly
+outnumbers the number of streams.  
+For example, \textsf{\small PCStream} should be improved in its PC clustering method 
+so that it can work effectively even when there are more PCs than the number of streams.  
+We also plan to evaluate \textsf{\small PCStream} on real SSDs 
+by implementing the two-phase stream assignment algorithm inside an FTL.

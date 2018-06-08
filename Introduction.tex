@@ -33,15 +33,14 @@ algorithm. Since $MAX_{P/E}$ and $C$ is determined when the device is manufactur
 we should reduce the $W_{day}$ and $WAF$ to improve the lifetime of SSDs.
 Many existing lifetime-enhancing techniques have been focused on reducing $WAF$
 by increasing the efficiency of an FTL algorithm. For example, by avoiding
-unnecessary data copies during garbage collection, $WAF$ can be reduced.
+unnecessary data copies during garbage collection 
+using the multi-stream feature, $WAF$ can be reduced.
 In order to reduce $W_{day}$, various system-level techniques were proposed.
 For example, data deduplication, data compression, and write traffic 
 throttling are such techniques.
 
-
-
-기존 기법들의 문제점 간단히 지적,  -> 
-cross layer 최적화가 필요하다. 
+Most existing studies, however, are based on the the single I/O layer such as 
+block I/O, device driver, and SSD firmware so their effectiveness is limited.
 In order for NAND flash-based storage devices to be broadly adopted in
 various computing environments, therefore,
 new approaches that properly address the lifetime problem of recent
@@ -79,7 +78,25 @@ and then develop the lifetime improvement approaches that efficiently exploit su
 high-level information at various system levels ranging from a system call layer 
 to a flash controller.
 
-First, 
+First, we propose a system-level approach to reduce WAF that exploits
+the I/O context of an application to increase the data lifetime prediction
+for the multi-streamed SSDs. 
+By extracting program contexts during runtime, data-to-stream mapping is done automatically.
+Thus, it can effectively separate data with
+short lifetimes from on with long lifetimes to improve the efficiency of garbage collection.
+Moreover, when data mapped to the same
+stream show large differences in their lifetimes,
+long-lived data of the current stream are moved to 
+its substream during garbage collection.
+
+Second, present a write traffic reduction approach which reduces the amount of
+write traffic sent to a storage by eliminating redundant data, therby improving
+the lifetime of storage devices. In particular, we increase the overall
+deduplication ratio\footnote{The percentage of identified duplicate writes}
+by introducing sub-page chunk based on the understanding of file system behavior.
+It resolves technical difficulties caused by its finer granularity, i.e., increased memory requirement and read
+response time. 
+
 \section{Contributions}
 In this dissertation, we present two system-level techniques to improve the 
 lifetime of NAND flash-based storage devices. 
@@ -87,21 +104,17 @@ The contributions of this dissertation can be summarized as follows:
 
 \begin{itemize}
 \item 
-We propose a fully automatic stream management technique, called \textsf{\small PCStream}, 
+We present a fully automatic stream management technique, called \textsf{\small PCStream}, 
 for multi-streamed SSDs based on program contexts (PCs).
 Since the key motivation behind \textsf{\small PCStream} was 
 that data lifetimes should be estimated at a higher abstraction level than LBAs, 
-\textsf{\small PCStream} employed a write program context\footnote{Since we are interested in write-related 
-system call such as write() in the Linux kernel, 
-we call the related program context as 
-{\it write program contexts} or simply {\it program contexts} in this paper.}  
+\textsf{\small PCStream} employed a write program context
 as a stream management unit.
 A program context~\cite{PC, PC2}, which represents a particular execution phase of a program, 
 is known to be an effective hint in separating data with different lifetimes~\cite{PCHa}.  
 \textsf{\small PCStream} automatically maps an identified program context to a stream.  
 Since program contexts can be computed during runtime, 
 \textsf{\small PCStream} does not need any manual work.   
-
 
 \item
 We propose a fine-grained deduplication technique for flash-based SSDs, called \textit{FineDedup}.
@@ -113,16 +126,27 @@ With a smaller deduplication unit,
 many data segments within a page can be detected as a duplicate one, 
 so the amount of data written to flash memory can be reduced regardless of a physical page size.
 
-
-Although most program contexts show that their data lifetimes are 
-distributed with small variances, we observed a few outliers 
-whose data lifetimes have rather large variances.
-In \textsf{\small PCStream}, 
-when such a PC {\it pID} is observed (which was mapped to a stream {\it sID}), 
-the long-lived data of {\it pID} are moved to the substream of {\it sID}
-during GC.  
-The substream prevents the long-lived data of the stream {\it sID} 
-from being mixed with future short-lived data of the stream {\it sID}.
-
+\item
+We implement the proposed techniques in the Linux kernel and our in-house flash storage
+prototype. Then, we evaluate their effects on lifetime using various real-world applications.
+ 
 \end{itemize}
+
+\section{Dissertation Structure}
+This dissertation is composed of five chapters. The first chapter is the introduction
+of theh dissertation, while the last chapter serves as conclusions with a summary
+and future work. The three intermediate chapters are organized as follows:
+
+Chapter 2 provides the overall architecture of NAND flash-based storage devices.
+We also describe the existing lifetime improvement techniques for flash-based devices,
+focusing on multi-streamed SSDs and deduplication techniques which are highly related
+to our proposed techniques.
+
+In Chapter 3, we present a new data separation technique, called PCStream, 
+for multi-streamed SSDs. We explain the relationship of dominant I/O activities
+with data lifetime patterns. 
+
+Chapter 4 introduces a fine-grained deduplication technique, called FineDedup, for NAND
+flash-based storage devices. We describe the patterns of duplicate data with in a page.
+Finally, we show how effective the proposed technique is in terms of write traffic reduction.
 

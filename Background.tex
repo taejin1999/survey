@@ -1,11 +1,54 @@
 
-\chapter{Background} 
+\chapter{Related Work} 
 \label{chap:Background}
 
+\section{Data Separation Techniques for Multi-streamed SSDs}
+Research exists to detect data temperature. Park, et al. uses multiple bloom
+filters to identify hot data in the device layer. Stoica, et
+al. propose new data placement algorithms to improves
+flash write performance by estimating data update frequencies.
+Luo, et al. observe high temporal write
+locality in different workloads and design a write-hotness
+aware retention management policy to improve flash memory
+life time. Most research is on a simulation or mathematical
+modeling basis and those lack of real world system and
+performance analysis. It is hard to guarantee the benefit
+of these algorithms in a dynamic I/O intensive datacenter
+workloads. In adition, as multi-stream SSDs
+become available, there is a need to identify data temperature
+and separate them to multiple levels (usually more
+than three levels - hot, cold and warm) to fully utilize such
+devices.
 
-\subsection{Related Work}
+In order to achieve high performance on multi-streamed SSDs, data with similar 
+{\it future} update times~\cite{PCHa}
+should be allocated 
+to the same stream, so that the copy cost of GC can be minimized.
+However, since it is difficult to know the future update times {\it a priori} when they are written,
+stream allocation decisions are often {\it manually} made 
+by programmers based on their expertise
+on the application~\cite{MultiStream, Level} or the file system~\cite{FStream}.  
+Furthermore, these manual techniques assume 
+that the number of streams in an SSD is not changing, 
+thus requiring manual modifications whenever the number of streams in the SSD changes.
 
-\subsubsection{Write Traffic Reduction Techniques}
+To the best of our knowledge, \textsf{\small AutoStream}~\cite{AutoStream} is the only automatic 
+stream management technique
+without additional manual work.  
+However, since \textsf{\small AutoStream} predicts data lifetimes using the update frequency 
+of the logical block address (LBA), it does not work well with modern append-only workloads 
+such as RocksDB~\cite{RocksDB} or Cassandra~\cite{Cassandra}.  
+Unlike conventional update workloads where data written to the same LBAs 
+often show strong update locality, 
+append-only workloads make it impossible to predict data lifetimes 
+from LBA characteristics (such as access frequency or access patterns).  
+For example, as shown in Fig.~\ref{fig:lba_lifetime}(b), 
+data written to a fixed LBA range over time in RocksDB 
+show widely varying data lifetimes, 
+thus making it difficult to allocate streams based on LBA characteristics.
+
+
+\section{Write Traffic Reduction Techniques}
 In order to extend the lifetime of flash-based SSDs,
 data deduplication techniques have been used in recent SSDs
 because they are effective in reducing the amount of data written to flash memory by preventing duplicate data from being written again~\cite{caftl,value-locality}.
@@ -85,17 +128,32 @@ In general, variable-size deduplication techniques can identify more data as dup
 Since variable-size deduplication adaptively changes the size of chunks by analyzing the contents of input stream,
 duplicate data are more effectively found regardless of their locations.
 In spite of its advantages, variable-size deduplication is not commonly used in SSDs because of the following practical limitations.
-First, variable-size deduplication often requires
-the entire data contents to be available.
-Therefore, it is commonly adopted at the level of operating systems or file systems.
-Second, the CDC algorithm often requires relatively high computational power and a large amount of memory space.
-Thus, variable-size deduplication is not appropriate to be employed at the level of storage devices
-where computing and memory resources are constrained.
-Lastly, the size of remaining unique data after deduplication may vary in variable-size deduplication.
-When writing those data, a complicated scheme for data size management is required to form sub-page
-data chunks to fit in a flash page size, preventing an internal fragmentation.
+
+First, the CDC algorithm often requires relatively high computational power and a large amount of memory space. 
+Thus, variable-size deduplication is not appropriate to be employed at the level of 
+storage devices where computing and memory resources are constrained. 
+Second, the size of remaining unique data after deduplication may vary in variable-size deduplication. 
+When writing those data, a complicated scheme for data size management is required 
+to form sub-page data chunks to fit in a flash page size, preventing an internal fragmentation. 
 For those reasons, most existing deduplication techniques for SSDs employ fixed-size deduplication, 
 which is relatively simple and does not require a significant amount of hardware resources.
+
+There are several existing studies for fixed-size deduplication for SSDs. F. Chen~\cite{caftl} proposed CAFTL 
+to enhance the endurance of SSDs with a set of acceleration techniques to reduce runtime overhead. 
+A. Gupta~\cite{value-locality} also proposed CA-SSD to improve the reliability of SSDs by exploiting the value locality, 
+which implies that certain data items are likely to be accessed preferentially. 
+In these studies, authors focused on the feasibility of deduplication at SSD level and 
+proved its effectiveness rather than improving deduplication itself.
+
+Recently, several deduplication techniques for flash-based storage are proposed. Z. Chen~\cite{order-merge}
+proposed OrderMergeDedup which orders and merges the deduplication metadata with data writes to 
+realize failure-consistent storage with deduplication.  
+W. Li~\cite{cachededup} proposed CacheDedup which integrates deduplication with caching architecture to 
+address limited endurance of flash caching by managing data writes and deduplication metadata together, 
+and proposing duplication-aware cache replacement algorithms. 
+These studies focus on systematic approach such as block layer or flash caching. 
+However, this study improves the effect of deduplication in the device-specific domain, 
+so the approach of this study is quite different.
 
 Similar to the existing deduplication techniques,
 the proposed FineDedup technique is also based on fixed-size deduplication.
@@ -104,24 +162,6 @@ however, FineDedup improves the likelihood of eliminating duplicate data.
 This approach can complement the limitation of existing fixed-size deduplication techniques,
 which exhibit a relatively low amount of removed writes 
 in comparison with variable-size deduplication.
-
-
-\subsubsection{Data Separation Techniques}
-
-To the best of our knowledge, \textsf{\small AutoStream}~\cite{AutoStream} is the only automatic 
-stream management technique
-without additional manual work.  
-However, since \textsf{\small AutoStream} predicts data lifetimes using the update frequency 
-of the logical block address (LBA), it does not work well with modern append-only workloads 
-such as RocksDB~\cite{RocksDB} or Cassandra~\cite{Cassandra}.  
-Unlike conventional update workloads where data written to the same LBAs 
-often show strong update locality, 
-append-only workloads make it impossible to predict data lifetimes 
-from LBA characteristics (such as access frequency or access patterns).  
-For example, as shown in Fig.~\ref{fig:lba_lifetime}(b), 
-data written to a fixed LBA range over time in RocksDB 
-show widely varying data lifetimes, 
-thus making it difficult to allocate streams based on LBA characteristics.
 
 
 

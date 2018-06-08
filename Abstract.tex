@@ -1,5 +1,38 @@
 \begin{abstract}
 
-TBD
+Replacing HDDs with NAND flash-based storage devices (SSDs) has been one of the major 
+challenges in modern computing systems especially in regards to better performance and higher mobility.
+Although uninterrupted semiconductor process scaling and multi-leveling techniques 
+lower the price of SSDs to the comparable level of HDDs, the decreasing lifetime of NAND flash memory, 
+as a side effect of recent advanced device technologies, 
+is emerging as one of the major barriers to the wide adoption of SSDs in high-performance computing systems.
+
+In this dissertation, we argue that cross-layer optimization techniques, which vertically
+integrate various optimization factors from different design abstraction levels, can play
+key roles in improving the lifetime of high-density NAND flash memory.
+
+We first propose a system-level approach to reduce WAF that exploits
+the I/O context of an application to increase the data lifetime prediction
+for the multi-streamed SSDs. 
+By extracting program contexts during runtime, data-to-stream mapping is done automatically.
+Thus, it can effectively separate data with
+short lifetimes from on with long lifetimes to improve the efficiency of garbage collection.
+
+Second, present a write traffic reduction approach which reduces the amount of
+write traffic sent to a storage by eliminating redundant data, therby improving
+the lifetime of storage devices. 
+In particular, we improve the likelihood of eliminating redundant data
+by introducing sub-page chunk based on the understanding of file system behavior.
+It resolves technical difficulties caused by its finer granularity, i.e., increased memory requirement and read
+response time. 
+
+In order to evaluate the effectiveness of the proposed techniques, we performed 
+a series of evaluations using both a trace-driven simulator and emulator with I/O
+traces which were collected from various real-world systems.
+To understand the feasibility of the proposed techniques, we also implemented them
+in Linux kernel on top of our in-house flash storage prototype and then evaluated
+their effects on the lifetime while running real-world applications.
+Our experimental results show that cross-layer optimization techniques are
+more effective over single-layer optimization techniques.
 
 \end{abstract}
