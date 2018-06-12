@@ -147,18 +147,18 @@
 	\setlength{\parskip}{0pt}
 	\begin{center}
 		{\fontsize{19}{19}\selectfont {\bfseries {\@title}} \par}
-		\vspace*{5pt}
-		{\fontsize{15}{15}\selectfont {\bfseries {\@engtitle}} \par}
 		\vspace*{10pt}
+		{\fontsize{15}{15}\selectfont {\bfseries {\@engtitle}} \par}
+		\vspace*{12pt}
 		{\fontsize{13}{13}\selectfont {{\@advisor} \par}}
-		\null\vfill\vspace{-35pt}
+		\null\vfill\vspace{-15pt}
 		{\fontsize{13}{13}\selectfont {이 논문을 {\@degreetitle} 학위논문으로 제출함 \par}}
 		{\fontsize{12}{12}\selectfont {{\@submitdate} \par}}
 		\vspace*{9pt}
 		{\fontsize{13}{13}\selectfont {{\@university} \par}}
 		{\fontsize{12}{12}\selectfont {{\@collegeordept} \par}}
 		{\fontsize{14}{14}\selectfont {{\@author} \par}}
-		\null\vfill\vspace{-26pt}
+		\null\vfill\vspace{-16pt}
 		{\fontsize{13}{13}\selectfont {{\@author}의 {\@msorphd} 학위논문을 인준함 \par}}
 		{\fontsize{12}{12}\selectfont {{\@acceptdate} \par}}
 		\vspace*{23pt}
